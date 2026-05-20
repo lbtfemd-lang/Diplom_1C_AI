@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+env/
+.venv/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite3
+
+# ML artifacts
+*.npy
+*.pkl
+*.h5
+*.pt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# 1C dumps
+*.dt
+
+# Logs
+*.log
+
+# Docker
+*.tar
+
+# Project-specific generated files
+metadata_store.json
+metadata_index_lite.json
+
+# Agent/IDE metadata
+.kiro/
+
+# Test cache
+.pytest_cache/
+_pytest_tmp/

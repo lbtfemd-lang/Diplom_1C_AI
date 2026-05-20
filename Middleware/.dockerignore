@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.env
+kanban.db
+*.egg-info/
+tests/
+generate_embeddings.py
+README.md

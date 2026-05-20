@@ -1,0 +1,44 @@
+fig_2_4 — ER-диаграмма
+
+Холст: 2200×1000
+
+Заголовок:
+Рисунок 2.4 — ER-диаграмма базы данных SQLite
+
+3 таблицы-прямоугольника:
+
+users (x=80, y=150, w=400) — оранжевый заголовок:
+  🔑 id: INT PK
+  username: VARCHAR(100)
+  password_hash: VARCHAR(200)
+  full_name: VARCHAR(200)
+  role: VARCHAR(20)
+  department_id: INT FK →
+  is_active: BOOLEAN
+  avatar_color: VARCHAR(10)
+  created_at: DATETIME
+
+departments (x=600, y=150, w=400) — зелёный заголовок:
+  🔑 id: INT PK
+  name: VARCHAR(200)
+  head_user_id: INT FK →
+  parent_id: INT FK →
+  created_at: DATETIME
+
+kanban_tasks (x=600, y=500, w=400) — синий заголовок:
+  🔑 id: INT PK
+  title: VARCHAR(500)
+  column: VARCHAR(50)
+  priority: VARCHAR(20)
+  assignee: VARCHAR(200)
+  department_id: INT FK →
+  synced_1c: BOOLEAN
+  created_at: DATETIME
+
+Связи (стрелки СНАРУЖИ таблиц, не пересекая текст):
+1. users.department_id → departments.id — N:1 (стрелка между таблицами, подпись сбоку)
+2. departments.head_user_id → users.id — 1:1 (стрелка между таблицами сверху, подпись сверху)
+3. departments.parent_id → departments.id — 1:N самоссылка (дуга СНАРУЖИ таблицы — сверху или справа, не внутри)
+4. kanban_tasks.department_id → departments.id — N:1 (вертикальная стрелка, подпись сбоку)
+
+ВАЖНО для связей: все линии связей рисуются ВНЕ таблиц, с достаточным зазором. Подписи (N:1, 1:1 и т.д.) — рядом со стрелкой, но не на ней.
