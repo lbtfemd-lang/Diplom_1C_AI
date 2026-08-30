@@ -2,7 +2,8 @@
 # 1C AI Assistant Middleware — Python зависимости
 # =============================================================================
 # Версии зафиксированы по результатам pip freeze в чистом venv (Python 3.12.10)
-# на 16 мая 2026 г. Все 29 тестов middleware зелёные на этом наборе.
+# на 26 мая 2026 г. На 30 августа 2026 г. все 46 обнаруживаемых тестов
+# middleware проходят на этом наборе.
 # Для установки в чистом venv:
 #     python -m venv .venv
 #     .venv\Scripts\python.exe -m pip install --upgrade pip
@@ -29,9 +30,10 @@ SQLAlchemy==2.0.49
 python-jose[cryptography]==3.5.0  # JWT-токены
 passlib[bcrypt]==1.7.4            # хеширование паролей (обёртка над bcrypt)
 bcrypt<4                          # ВАЖНО: passlib 1.7.4 несовместим с bcrypt 4.x
-                                  # (отсутствует атрибут bcrypt.__about__)
-                                  # фиксируется на bcrypt 3.x (актуальная 3.2.2)
+                                   # (отсутствует атрибут bcrypt.__about__)
+                                   # фиксируется на bcrypt 3.x (актуальная 3.2.2)
 cryptography==48.0.0
+slowapi==0.1.9                    # rate limiting (защита от брутфорса /auth/login)
 
 # --- Окружение -------------------------------------------------------------
 python-dotenv==1.2.2

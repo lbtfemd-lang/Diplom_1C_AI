@@ -21,6 +21,8 @@ class TaskSource(str, Enum):
     WEB = "web"
     CHAT = "chat"
     ONE_C = "1c"
+    ONE_C_KANBAN = "1c_kanban"
+    ONE_C_MOBILE = "1c_mobile"
 
 
 class KanbanTaskCreate(BaseModel):

@@ -1,12 +1,24 @@
 import sys
 import os
+import logging
+from contextlib import asynccontextmanager
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, HTTPException, Depends, Query, Security
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+from fastapi import FastAPI, HTTPException, Depends, Query, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.models.api_models import ChatRequest, ChatResponse, MetadataRequest
 from app.models.kanban_models import (
@@ -18,33 +30,55 @@ from app.models.auth_models import (
     LoginRequest, LoginResponse, UserCreate, UserUpdate, UserResponse,
     DepartmentCreate, DepartmentUpdate, DepartmentResponse, NotificationResponse,
 )
-from app.models.tender_models import (
-    MatchRequest,
-    MatchResponse,
-    TenderParseRequest,
-    TenderParseResponse,
-)
-from app.core import is_drone_feature_enabled
 from app.services.llm_service import llm_service
 from app.services.metadata_service import metadata_service
 from app.services.kanban_service import kanban_service
 from app.services.auth_service import auth_service
-from app.services.drone_index_service import drone_index_service
-from app.services.component_index_service import component_index_service
-from app.services.tender_service import TenderParseError, get_tender_service
-from typing import List, Optional
+
+from typing import Any, Dict, List, Optional
 import io
 import uvicorn
 
-app = FastAPI(title="1C AI Assistant Middleware")
+@asynccontextmanager
+async def _lifespan(app_instance):
+    jwt_secret = os.getenv("JWT_SECRET", "")
+    if not jwt_secret or jwt_secret in ("your_jwt_secret_key_here", "changeme"):
+        logger.warning("JWT_SECRET is not properly configured. Set a strong secret in .env!")
+    api_key = os.getenv("FIREWORKS_API_KEY") or os.getenv("OPENROUTER_API_KEY") or ""
+    if not api_key or api_key.startswith("your_"):
+        logger.warning("No LLM API key configured. Chat functionality will not work.")
+    yield
+
+
+app = FastAPI(title="1C AI Assistant Middleware", lifespan=_lifespan)
+
+_rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("true", "1", "yes")
+
+if _rate_limit_enabled:
+    limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+else:
+    limiter = Limiter(key_func=get_remote_address, enabled=False, default_limits=["100000/minute"])
+    app.state.limiter = limiter
+
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _request_logging(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", "-")
+    logger.info("%s %s req_id=%s", request.method, request.url.path, request_id)
+    response = await call_next(request)
+    return response
 
 
 api_key_scheme = APIKeyHeader(name="X-Auth-Token", auto_error=False)
@@ -76,15 +110,32 @@ def require_role(user: dict, *roles):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
 
-@app.get("/")
+@app.get("/", response_model=Dict[str, Any])
 def read_root():
     return {"status": "ok", "service": "1C AI Assistant Middleware"}
+
+
+@app.get("/health", response_model=Dict[str, Any])
+async def health_check():
+    from sqlalchemy import text
+    checks = {"status": "ok", "service": "1C AI Assistant Middleware"}
+    try:
+        session = auth_service._get_session()
+        session.execute(text("SELECT 1"))
+        session.close()
+        checks["db"] = "ok"
+    except Exception as e:
+        checks["db"] = f"error: {e}"
+        checks["status"] = "degraded"
+    checks["llm"] = "configured" if llm_service.client else "not_configured"
+    return checks
 
 
 # ─── AUTH ────────────────────────────────────────────────────────────────────
 
 @app.post("/auth/login", response_model=LoginResponse)
-async def login(req: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, req: LoginRequest):
     user = auth_service.authenticate(req.username, req.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -127,6 +178,8 @@ async def update_me(req: UserUpdate, user: dict = Depends(get_current_user)):
 @app.get("/auth/users", response_model=List[UserResponse])
 async def list_users(
     department_id: Optional[int] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     user: dict = Depends(get_current_user),
 ):
     if user["role"] == "employee":
@@ -136,7 +189,7 @@ async def list_users(
     else:
         dept = department_id
     users = auth_service.list_users(department_id=dept)
-    return [UserResponse(**u) for u in users]
+    return [UserResponse(**u) for u in users[skip:skip + limit]]
 
 
 @app.put("/auth/users/{user_id}", response_model=UserResponse)
@@ -149,7 +202,7 @@ async def update_user(user_id: int, req: UserUpdate, caller: dict = Depends(get_
     return UserResponse(**result)
 
 
-@app.delete("/auth/users/{user_id}")
+@app.delete("/auth/users/{user_id}", response_model=Dict[str, Any])
 async def delete_user(user_id: int, caller: dict = Depends(get_current_user)):
     require_role(caller, "admin")
     if not auth_service.delete_user(user_id):
@@ -185,7 +238,7 @@ async def update_department(dept_id: int, req: DepartmentUpdate, user: dict = De
     return DepartmentResponse(**result)
 
 
-@app.delete("/departments/{dept_id}")
+@app.delete("/departments/{dept_id}", response_model=Dict[str, Any])
 async def delete_department(dept_id: int, user: dict = Depends(get_current_user)):
     require_role(user, "admin")
     if not auth_service.delete_department(dept_id):
@@ -195,32 +248,23 @@ async def delete_department(dept_id: int, user: dict = Depends(get_current_user)
 
 # ─── CHAT ────────────────────────────────────────────────────────────────────
 
-@app.post("/update_metadata")
+@app.post("/update_metadata", response_model=Dict[str, Any])
 async def update_metadata_endpoint(request: MetadataRequest, user: dict = Depends(get_current_user)):
     require_role(user, "admin")
     try:
         items_dict = [item.model_dump() for item in request.items]
         metadata_service.update_metadata(items_dict)
         result = {"status": "ok", "count": len(items_dict)}
-
-        # Прикладное расширение: каталоги БПЛА и комплектующих.
-        if is_drone_feature_enabled():
-            if request.drones is not None:
-                drone_index_service.rebuild_from_drones(list(request.drones))
-                result["drones_count"] = len(request.drones)
-            if request.components is not None:
-                component_index_service.rebuild_from_components(list(request.components))
-                result["components_count"] = len(request.components)
-
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest, user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def chat_endpoint(request: Request, req: ChatRequest, user: dict = Depends(get_current_user)):
     try:
-        response_data = await llm_service.generate_response(request.messages, context=request.context)
+        response_data = await llm_service.generate_response(req.messages, context=req.context)
         action = response_data.get("action")
 
         if action == "create_kanban_task" and response_data.get("data"):
@@ -250,80 +294,6 @@ async def chat_endpoint(request: ChatRequest, user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ─── TENDER MATCHER (прикладное расширение БПЛА) ─────────────────────────────
-
-def _require_drone_feature():
-    if not is_drone_feature_enabled():
-        # Фича выключена — поведение, как будто эндпоинта нет.
-        raise HTTPException(status_code=404, detail="Not Found")
-
-
-@app.post("/tender/parse", response_model=TenderParseResponse)
-async def tender_parse_endpoint(req: TenderParseRequest, user: dict = Depends(get_current_user)):
-    _require_drone_feature()
-    require_role(user, "manager", "admin")
-    try:
-        requirements = await get_tender_service().parse(req.tender_text)
-    except TenderParseError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail="Не удалось распознать требования тендера. "
-                   "Попробуйте уточнить формулировку или ввести характеристики списком.",
-        ) from exc
-    summary = _summarize_requirements(requirements)
-    return TenderParseResponse(requirements=requirements, summary=summary)
-
-
-@app.post("/tender/match", response_model=MatchResponse)
-async def tender_match_endpoint(req: MatchRequest, user: dict = Depends(get_current_user)):
-    _require_drone_feature()
-    require_role(user, "manager", "admin")
-    if req.requirements.intent in ("ready_model", "auto") and not drone_index_service.is_ready():
-        raise HTTPException(
-            status_code=503,
-            detail="Каталог БПЛА не загружен. Нажмите «Обновить метаданные» в 1С.",
-        )
-    return await get_tender_service().match(req.requirements)
-
-
-def _summarize_requirements(req) -> str:
-    """Короткое читаемое резюме извлечённых требований по-русски."""
-    parts = []
-    type_map = {
-        "quadcopter": "квадрокоптер", "hexacopter": "гексакоптер",
-        "octocopter": "октокоптер", "fixed_wing": "самолётный тип",
-        "helicopter": "вертолёт", "vtol_hybrid": "VTOL-гибрид",
-    }
-    purpose_map = {
-        "educational": "учебный", "fpv_racing": "FPV-гонки",
-        "logistics": "логистика", "aerial_photo": "аэрофотосъёмка",
-        "surveillance": "наблюдение", "general": "общего назначения",
-    }
-    if req.drone_type:
-        parts.append(type_map.get(req.drone_type, req.drone_type))
-    if req.purpose:
-        parts.append(purpose_map.get(req.purpose, req.purpose))
-    if req.motor_count_min:
-        parts.append(f"{req.motor_count_min} мотор(а/ов)")
-    if req.payload_min_kg:
-        parts.append(f"грузоподъёмность ≥ {req.payload_min_kg} кг")
-    if req.flight_time_min_minutes:
-        parts.append(f"время полёта ≥ {req.flight_time_min_minutes} мин")
-    if req.range_min_km:
-        parts.append(f"дальность ≥ {req.range_min_km} км")
-    if req.frame_diagonal_mm:
-        parts.append(f"диагональ {req.frame_diagonal_mm} мм")
-    if req.programmable_languages:
-        parts.append("языки: " + ", ".join(req.programmable_languages))
-    if req.quantity:
-        parts.append(f"количество {req.quantity} шт.")
-    if req.budget_per_unit_rub:
-        parts.append(f"бюджет {int(req.budget_per_unit_rub)} ₽/шт.")
-    if not parts:
-        return "Распознавание выполнено, но конкретных требований не выделено."
-    return "Распознано: " + ", ".join(parts) + "."
-
-
 # ─── KANBAN API ──────────────────────────────────────────────────────────────
 
 @app.get("/kanban/board", response_model=KanbanBoardResponse)
@@ -342,9 +312,11 @@ async def get_tasks(
     filter_dept: Optional[int] = None,
     filter_assignee: Optional[str] = None,
     filter_priority: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     user: dict = Depends(get_current_user),
 ):
-    return kanban_service.get_tasks_for_user(
+    tasks = kanban_service.get_tasks_for_user(
         user_id=user["id"],
         role=user["role"],
         department_id=user.get("department_id"),
@@ -353,6 +325,7 @@ async def get_tasks(
         filter_assignee=filter_assignee,
         filter_priority=filter_priority,
     )
+    return tasks[skip:skip + limit]
 
 
 @app.post("/kanban/tasks", response_model=KanbanTaskResponse)
@@ -452,7 +425,7 @@ async def move_task(move: KanbanTaskMove, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/kanban/tasks/{task_id}")
+@app.delete("/kanban/tasks/{task_id}", response_model=Dict[str, Any])
 async def delete_task(task_id: int, user: dict = Depends(get_current_user)):
     existing = kanban_service.get_task(task_id)
     if not existing:
@@ -487,13 +460,13 @@ async def get_notifications(user: dict = Depends(get_current_user)):
 
 # ─── 1C SYNC ──────────────────────────────────────────────────────────────────
 
-@app.get("/kanban/sync/1c")
+@app.get("/kanban/sync/1c", response_model=Dict[str, Any])
 async def get_tasks_for_1c(user: dict = Depends(get_current_user)):
     require_role(user, "admin")
     return kanban_service.get_tasks_for_1c_sync()
 
 
-@app.post("/kanban/sync/1c")
+@app.post("/kanban/sync/1c", response_model=Dict[str, Any])
 async def mark_tasks_synced(task_ids: List[int], user: dict = Depends(get_current_user)):
     require_role(user, "admin")
     kanban_service.mark_synced(task_ids)

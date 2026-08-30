@@ -22,14 +22,5 @@ class MetadataItem(BaseModel):
     fields: Optional[List[dict]] = None
 
 class MetadataRequest(BaseModel):
-    """Запрос /update_metadata.
-
-    Базовая секция `items` — стандартные метаданные конфигурации УНФ.
-    Опциональные секции `drones` и `components` — каталоги прикладного
-    расширения «Подбор моделей БПЛА». Если они не переданы, поведение
-    эндпоинта совпадает с прежним (обратная совместимость).
-    """
     items: List[MetadataItem]
-    drones: Optional[List[dict]] = None
-    components: Optional[List[dict]] = None
 

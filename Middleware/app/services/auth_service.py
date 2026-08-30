@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -16,21 +17,27 @@ def _utcnow() -> datetime:
 from typing import Optional, List
 
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "kanban.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-JWT_SECRET = os.getenv("JWT_SECRET", secrets.token_hex(32))
+_jwt_secret_raw = os.getenv("JWT_SECRET", "")
+JWT_SECRET = _jwt_secret_raw if _jwt_secret_raw else secrets.token_hex(32)
+if not _jwt_secret_raw:
+    logger.warning("JWT_SECRET not set — using random secret (tokens invalid after restart)")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
@@ -109,7 +116,7 @@ class AuthService:
             if session.query(UserDB).count() > 0:
                 return
 
-            print("Seeding demo data...")
+            logger.info("Seeding demo data...")
 
             departments = [
                 DepartmentDB(name="Продажи"),
@@ -177,10 +184,10 @@ class AuthService:
             departments[3].head_user_id = users[0].id
 
             session.commit()
-            print("Demo data seeded: 4 departments, 6 users.")
+            logger.info("Demo data seeded: 4 departments, 6 users.")
         except Exception as e:
             session.rollback()
-            print(f"Seed error: {e}")
+            logger.error("Seed error: %s", e)
         finally:
             session.close()
 

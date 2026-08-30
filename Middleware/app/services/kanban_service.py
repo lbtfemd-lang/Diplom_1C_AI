@@ -13,13 +13,14 @@ def _utcnow() -> datetime:
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, and_, or_
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from typing import List, Optional, Dict
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "kanban.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 class KanbanTaskDB(Base):

@@ -42,6 +42,25 @@ node_modules/
 
 # 1C dumps
 *.dt
+*.cf
+config_unpacked/
+src/
+release/
+
+# Backups and temporary copies
+*.bak
+*.bak*
+*~
+*_backup/
+text/figures_backup/
+*копия*
+*рерайт*
+*_fixed*
+
+# Local/generated release data
+release/Middleware/kanban.db
+release/Middleware/metadata_*.json
+release/Middleware/_t.log
 
 # Logs
 *.log
@@ -59,3 +78,4 @@ metadata_index_lite.json
 # Test cache
 .pytest_cache/
 _pytest_tmp/
+.pytest_tmp/

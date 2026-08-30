@@ -2,16 +2,18 @@
 Singleton-обёртка над sentence-transformers для всех векторных индексов middleware.
 
 Модель `paraphrase-multilingual-MiniLM-L12-v2` загружается один раз и
-переиспользуется в `metadata_service`, `drone_index_service` и
-`component_index_service`. Если sentence-transformers не установлен или
+переиспользуется в `metadata_service`. Если sentence-transformers не установлен или
 загрузка модели падает, все индексы переходят в режим word-overlap fallback.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import List, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
@@ -34,12 +36,12 @@ def _try_load_model():
 
     try:
         from sentence_transformers import SentenceTransformer
-        print(f"Loading embedding model ({MODEL_NAME})...")
+        logger.info("Loading embedding model (%s)...", MODEL_NAME)
         _model = SentenceTransformer(MODEL_NAME)
         _USE_ML = True
-        print("Embedding model loaded.")
+        logger.info("Embedding model loaded.")
     except Exception as exc:  # pragma: no cover - окружение без модели
-        print(f"Failed to load embedding model: {exc}")
+        logger.error("Failed to load embedding model: %s", exc)
         _model = None
         _USE_ML = False
 
@@ -66,7 +68,7 @@ def encode_texts(texts: List[str]) -> Optional[np.ndarray]:
     try:
         return model.encode(texts, convert_to_numpy=True)
     except Exception as exc:  # pragma: no cover
-        print(f"encode_texts failed: {exc}")
+        logger.error("encode_texts failed: %s", exc)
         return None
 
 

@@ -33,6 +33,8 @@ python-dotenv==1.2.2
 
 # --- ML / эмбеддинги (минимальный набор) ---
 numpy==2.4.5
-# В облачном профиле RAG работает на word-overlap fallback из metadata_service.
+# В текущей реализации word-overlap fallback не включается без загруженного
+# массива embeddings из-за ранней проверки в metadata_service. До исправления
+# облачный профиль без sentence-transformers фактически работает без RAG.
 # Для полноценного семантического поиска добавить отдельной командой:
 #     pip install sentence-transformers

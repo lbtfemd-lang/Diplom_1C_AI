@@ -1,6 +1,9 @@
 import json
+import logging
 import os
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 METADATA_FILE = "metadata_store.json"
 EMBEDDINGS_FILE = "metadata_embeddings.npy"
@@ -26,16 +29,16 @@ class MetadataService:
         self.model = None
 
         if USE_ML:
-            print("Loading AI model (paraphrase-multilingual-MiniLM-L12-v2)...")
+            logger.info("Loading AI model (paraphrase-multilingual-MiniLM-L12-v2)...")
             try:
                 self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-                print("Model loaded successfully.")
+                logger.info("Model loaded successfully.")
             except Exception as e:
-                print(f"Error loading model: {e}")
+                logger.error("Error loading model: %s", e)
                 self.model = None
                 USE_ML_FALLBACK = True
         else:
-            print("Lightweight mode: sentence-transformers not available. Using precomputed embeddings.")
+            logger.info("Lightweight mode: sentence-transformers not available. Using precomputed embeddings.")
 
         self.load_metadata()
 
@@ -44,16 +47,16 @@ class MetadataService:
             try:
                 with open(INDEX_LITE_FILE, "r", encoding="utf-8") as f:
                     self.metadata_index = json.load(f)
-                print(f"Loaded {len(self.metadata_index)} items from lite index.")
+                logger.info("Loaded %d items from lite index.", len(self.metadata_index))
             except Exception as e:
-                print(f"Error loading lite index: {e}")
+                logger.error("Error loading lite index: %s", e)
         elif os.path.exists(METADATA_FILE):
             try:
                 with open(METADATA_FILE, "r", encoding="utf-8") as f:
                     self.metadata_index = json.load(f)
-                print(f"Loaded {len(self.metadata_index)} items from full index.")
+                logger.info("Loaded %d items from full index.", len(self.metadata_index))
             except Exception as e:
-                print(f"Error loading metadata: {e}")
+                logger.error("Error loading metadata: %s", e)
 
         if self.metadata_index:
             self._load_embeddings()
@@ -62,10 +65,10 @@ class MetadataService:
         if os.path.exists(EMBEDDINGS_FILE):
             try:
                 self.embeddings = np.load(EMBEDDINGS_FILE)
-                print(f"Loaded precomputed embeddings: shape {self.embeddings.shape}")
+                logger.info("Loaded precomputed embeddings: shape %s", self.embeddings.shape)
                 return
             except Exception as e:
-                print(f"Error loading embeddings: {e}")
+                logger.error("Error loading embeddings: %s", e)
 
         if USE_ML and self.model:
             self._update_embeddings()
@@ -75,18 +78,18 @@ class MetadataService:
         try:
             with open(METADATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.metadata_index, f, ensure_ascii=False, indent=2)
-            print(f"Metadata updated. Count: {len(self.metadata_index)}")
+            logger.info("Metadata updated. Count: %d", len(self.metadata_index))
 
             if USE_ML and self.model:
                 self._update_embeddings()
         except Exception as e:
-            print(f"Error saving metadata: {e}")
+            logger.error("Error saving metadata: %s", e)
 
     def _update_embeddings(self):
         if not self.metadata_index or not self.model:
             return
 
-        print("Updating embeddings...")
+        logger.info("Updating embeddings...")
 
         SYNONYM_MAP = {
             "Контрагенты":          "Клиент Покупатель Поставщик Заказчик Юрлицо Партнёр Дебитор",
@@ -124,7 +127,7 @@ class MetadataService:
         self.embeddings = self.model.encode(texts, convert_to_numpy=True)
 
         np.save(EMBEDDINGS_FILE, self.embeddings)
-        print("Embeddings updated and saved.")
+        logger.info("Embeddings updated and saved.")
 
     def find_top_matches(self, user_query: str, top_k: int = 5):
         if not self.metadata_index or self.embeddings is None:
@@ -153,7 +156,7 @@ class MetadataService:
 
             return matches
         except Exception as e:
-            print(f"Error in find_top_matches: {e}")
+            logger.error("Error in find_top_matches: %s", e)
             return []
 
     def _cosine_sim(self, query_emb: np.ndarray, corpus_emb: np.ndarray) -> np.ndarray:

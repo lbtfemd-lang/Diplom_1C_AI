@@ -1,9 +1,13 @@
 import os
 import json
 import re
+import asyncio
+import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 from .metadata_service import metadata_service
+
+logger = logging.getLogger(__name__)
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -12,25 +16,25 @@ class LLMService:
     def __init__(self):
         self.api_key = os.getenv("FIREWORKS_API_KEY") or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
-             print("WARNING: No API key found. Set FIREWORKS_API_KEY or OPENROUTER_API_KEY in .env")
+             logger.warning("No API key found. Set FIREWORKS_API_KEY or OPENROUTER_API_KEY in .env")
 
         if os.getenv("FIREWORKS_API_KEY"):
             self.base_url = "https://api.fireworks.ai/inference/v1"
             self.model = "accounts/fireworks/models/glm-5p1"
-            print("Using Fireworks AI (GLM 5.1)")
+            logger.info("Using Fireworks AI (GLM 5.1)")
         else:
             self.base_url = "https://openrouter.ai/api/v1"
             self.model = "qwen/qwen-2.5-72b-instruct"
-            print("Using OpenRouter (Qwen 2.5 72B)")
+            logger.info("Using OpenRouter (Qwen 2.5 72B)")
 
         try:
             self.client = OpenAI(
                 base_url=self.base_url,
                 api_key=self.api_key,
             )
-            print(f"LLM client initialized. Model: {self.model}")
+            logger.info("LLM client initialized. Model: %s", self.model)
         except Exception as e:
-            print(f"Error initializing LLM client: {e}")
+            logger.error("Error initializing LLM client: %s", e)
             self.client = None
 
     VALID_ACTIONS = {
@@ -38,7 +42,7 @@ class LLMService:
         "find_object", "prepare_payment", "accrual_writeoff",
         "warehouse_move", "employee_info", "get_dossier",
         "get_status", "get_stock", "get_debtors", "run_analytics",
-        "create_kanban_task", "show_kanban",
+        "create_kanban_task", "show_kanban", "update_metadata",
     }
 
     def _sanitize_json(self, text: str) -> str:
@@ -202,11 +206,12 @@ FEW-SHOT ПРИМЕРЫ:
             messages_payload.append({"role": role, "content": msg.text})
         
         try:
-            completion = self.client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "1C-AI-Assistant-Expert",
-            } if "openrouter" in self.base_url else {},
+            completion = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                extra_headers={
+                    "HTTP-Referer": "http://localhost:8000",
+                    "X-Title": "1C-AI-Assistant-Expert",
+                } if "openrouter" in self.base_url else {},
                 model=self.model,
                 messages=messages_payload,
                 temperature=0.3,
@@ -214,13 +219,13 @@ FEW-SHOT ПРИМЕРЫ:
             )
             
             generated_text = completion.choices[0].message.content
-            print(f"LLM Output: {generated_text}")
+            logger.debug("LLM Output: %s", generated_text)
             
             parsed = self._extract_json(generated_text)
             if parsed:
                 action = parsed.get("action", "")
                 if action and action not in self.VALID_ACTIONS:
-                    print(f"Unknown action '{action}', falling back to expert_answer")
+                    logger.warning("Unknown action '%s', falling back to expert_answer", action)
                     parsed["text"] = parsed.get("text", "") + f"\n(Неизвестное действие: {action})"
                     parsed["action"] = "expert_answer"
                     parsed["data"] = None
@@ -228,16 +233,18 @@ FEW-SHOT ПРИМЕРЫ:
                 user_lower = user_message_text.lower()
 
                 if parsed.get("action") == "expert_answer":
-                    if any(kw in user_lower for kw in ["канбан", "доск", "задач"]):
-                        if any(kw in user_lower for kw in ["покажи", "показ", "отобраз", "список", "какие", "открыть", "посмотри"]):
-                            parsed["action"] = "show_kanban"
-                            parsed["data"] = {}
-                            print(f"Post-processed: expert_answer -> show_kanban")
-                    elif any(kw in user_lower for kw in ["создай задач", "добавь задач", "поставь задач", "запланируй задач"]):
+                    is_show = any(kw in user_lower for kw in ["канбан", "доск", "задач"]) and any(kw in user_lower for kw in ["покажи", "показ", "отобраз", "список", "какие", "открыть", "посмотри"])
+                    is_create = any(kw in user_lower for kw in ["создай задач", "добавь задач", "поставь задач", "запланируй задач"])
+
+                    if is_show:
+                        parsed["action"] = "show_kanban"
+                        parsed["data"] = {}
+                        logger.debug("Post-processed: expert_answer -> show_kanban")
+                    elif is_create:
                         parsed["action"] = "create_kanban_task"
                         if not parsed.get("data"):
                             parsed["data"] = {"title": user_message_text[:100]}
-                        print(f"Post-processed: expert_answer -> create_kanban_task")
+                        logger.debug("Post-processed: expert_answer -> create_kanban_task")
 
                 return parsed
             else:
@@ -251,7 +258,7 @@ FEW-SHOT ПРИМЕРЫ:
                 }
                 
         except Exception as e:
-            print(f"LLM API Error: {e}")
+            logger.error("LLM API Error: %s", e)
             return {
                 "text": f"Ошибка нейросети: {e}",
                 "action": None,

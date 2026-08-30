@@ -14,6 +14,8 @@ from app.services.auth_service import UserDB, DepartmentDB
 
 TEST_JWT_SECRET = "test-secret-key-for-pytest"
 
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
 
 def _make_test_engine():
     eng = create_engine(
@@ -102,3 +104,28 @@ def make_user(client, token, username="testuser", password="test123", full_name=
     if department_id:
         data["department_id"] = department_id
     return client.post("/auth/register", json=data, headers=headers)
+
+
+class FakeEmbedder:
+    def __init__(self, dim=8):
+        self.dim = dim
+
+    def encode(self, texts, **kwargs):
+        if isinstance(texts, str):
+            return self._hash_vec(texts)
+        return [self._hash_vec(t) for t in texts]
+
+    def _hash_vec(self, text):
+        import numpy as np
+        vec = np.zeros(self.dim)
+        for i, ch in enumerate(text):
+            vec[i % self.dim] += ord(ch)
+        norm = np.linalg.norm(vec)
+        if norm > 0:
+            vec = vec / norm
+        return vec
+
+
+@pytest.fixture
+def fake_embedder():
+    return FakeEmbedder()
