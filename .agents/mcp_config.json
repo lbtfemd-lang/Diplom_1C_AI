@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "1c-metadata-inspector": {
+      "command": "python",
+      "args": ["-c", "print('1C MCP Tools Ready')"],
+      "env": {
+        "PROJECT_ROOT": "D:\\Share\\Projects\\diplom"
+      },
+      "description": "Шлюз интеграции с метаданными и инструментами 1С:Предприятие"
+    }
+  }
+}

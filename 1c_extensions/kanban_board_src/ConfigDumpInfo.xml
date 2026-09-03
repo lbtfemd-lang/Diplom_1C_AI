@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ConfigDumpInfo xmlns="http://v8.1c.ru/8.3/xcf/dumpinfo" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="Hierarchical" version="2.21">
+	<ConfigVersions>
+		<Metadata name="Configuration.KanbanBoard" id="683bf821-878f-4681-b528-dc7c040bb157" configVersion="c257f89f96f364b028915a229182b47588313520"/>
+		<Metadata name="Role.ОсновнаяРоль" id="4c62a141-b97a-464c-85d2-eb90c055ab14" configVersion="eb43bd85e0a8b841daafa9c04f962b73b5ae4c34"/>
+	</ConfigVersions>
+</ConfigDumpInfo>

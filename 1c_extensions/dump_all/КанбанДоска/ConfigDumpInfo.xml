@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ConfigDumpInfo xmlns="http://v8.1c.ru/8.3/xcf/dumpinfo" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="Hierarchical" version="2.21">
+	<ConfigVersions>
+		<Metadata name="Configuration.КанбанДоска" id="182b9ba9-cd30-48ed-8734-acf8184fbd05" configVersion="d65113786ca3e01b6ea7f27a9bbab477dd51cf59"/>
+		<Metadata name="DataProcessor.КанбанДоска" id="4f7cc525-8769-4a3d-8f8e-ef993a474e74" configVersion="738f8ccb6fb5fa7152ba7aa27c60267c43d9d03c"/>
+		<Metadata name="DataProcessor.КанбанДоска.Form.Форма" id="8b13a142-433d-4b73-a603-0555e48b4094" configVersion="f3b85a040544ed6cde295896252be3a2a63a52d2"/>
+		<Metadata name="DataProcessor.КанбанДоска.Form.Форма.Form" id="8b13a142-433d-4b73-a603-0555e48b4094.0" configVersion="8ba5ad53f5a571e4a7f9af7d1108582c3188aa55"/>
+		<Metadata name="Language.Русский" id="5f7a00ae-2c36-4cdf-b673-b804d1fb47c2" configVersion="ba54a4989c65a2d80740c301b5df440fa5092e1a"/>
+		<Metadata name="Role.КД_ОсновнаяРоль" id="a10a24bd-1825-47f0-8bcc-48f18faabd25" configVersion="cd619d7aa5a862a4cca4ce421544a9cc0fe832e6"/>
+	</ConfigVersions>
+</ConfigDumpInfo>

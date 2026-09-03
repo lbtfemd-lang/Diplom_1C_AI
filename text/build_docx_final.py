@@ -529,9 +529,23 @@ def build_docx():
     # Remove control characters that are invalid in XML (like form-feed or vertical tabs)
     md = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', md)
 
-    template_path = os.path.join(os.path.dirname(BASE), "ДИПЛОМ ФИНАЛ — копия.docx")
-    print(f"Loading template from {template_path}...")
-    doc = Document(template_path)
+    template_candidates = [
+        os.path.join(BASE, "template.docx"),
+        os.path.join(BASE, "Диплом_ИИ_ассистент_1С_окончательный.docx"),
+        os.path.join(os.path.dirname(BASE), "release", "text", "Диплом_ИИ_ассистент_1С_окончательный.docx")
+    ]
+    template_path = None
+    for cand in template_candidates:
+        if os.path.exists(cand):
+            template_path = cand
+            break
+            
+    if template_path:
+        print(f"Loading template from {template_path}...")
+        doc = Document(template_path)
+    else:
+        print("Creating new Document...")
+        doc = Document()
     
     print("Clearing template body...")
     for p in list(doc.paragraphs):

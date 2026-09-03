@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/1c-syntax/bsl-language-server/master/src/main/resources/bsl-language-server.schema.json",
+  "language": "ru",
+  "configurationRoot": "src",
+  "diagnostics": {
+    "computeTrigger": "onSave",
+    "parameters": {
+      "CognitiveComplexity": { "maxComplexity": 20 },
+      "CyclomaticComplexity": { "maxComplexity": 15 },
+      "MethodSize": { "maxLines": 150 },
+      "ModuleStructure": { "enabled": true },
+      "QueryInLoop": { "enabled": true },
+      "EmptyCodeBlock": { "enabled": true },
+      "UnusedLocalVariable": { "enabled": true },
+      "UnusedLocalMethod": { "enabled": true },
+      "LineLength": { "maxLineLength": 120 },
+      "ServerContextInvocationFromClientContext": { "enabled": true }
+    }
+  }
+}

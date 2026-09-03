@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ConfigDumpInfo xmlns="http://v8.1c.ru/8.3/xcf/dumpinfo" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="Hierarchical" version="2.21">
+	<ConfigVersions>
+		<Metadata name="Configuration.ИнтеллектуальныйАссистент" id="137364e4-23e2-4350-aa9e-1858790a5fcf" configVersion="60b627d3142bce15263e56df10454531ccbdd9c1"/>
+		<Metadata name="DataProcessor.ЧатСАссистентом" id="f85736b5-1a66-44ab-996d-36f214e17776" configVersion="3d05d546712ba2b71e22b86421b685b75a76a2eb"/>
+		<Metadata name="DataProcessor.ЧатСАссистентом.Form.Форма" id="47e15d84-1b82-4bd4-a743-505876163fca" configVersion="112451abc4102e7ab46ab3f9a77452bba4bdb13e"/>
+		<Metadata name="DataProcessor.ЧатСАссистентом.Form.Форма.Form" id="47e15d84-1b82-4bd4-a743-505876163fca.0" configVersion="c7485f85c03ea833ab8f784a8e6d735e98808324"/>
+		<Metadata name="Language.Русский" id="c7652f41-00ab-4e1e-bd02-823c2ee82833" configVersion="57d5f318373241fba464e083d18d352041e314d6"/>
+		<Metadata name="Role.ИА_ОсновнаяРоль" id="871d1c25-22a2-463f-9990-3ed943a86b41" configVersion="7d0ad6a1ce7ef908e9a97d31bf3afc11a1a97b9f"/>
+	</ConfigVersions>
+</ConfigDumpInfo>

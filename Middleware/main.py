@@ -134,7 +134,7 @@ async def health_check():
 # ─── AUTH ────────────────────────────────────────────────────────────────────
 
 @app.post("/auth/login", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def login(request: Request, req: LoginRequest):
     user = auth_service.authenticate(req.username, req.password)
     if not user:
