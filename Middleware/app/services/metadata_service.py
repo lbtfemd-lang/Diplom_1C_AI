@@ -5,9 +5,10 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-METADATA_FILE = "metadata_store.json"
-EMBEDDINGS_FILE = "metadata_embeddings.npy"
-INDEX_LITE_FILE = "metadata_index_lite.json"
+_BASE_DIR = os.getenv("METADATA_DATA_DIR") or os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+METADATA_FILE = os.path.join(_BASE_DIR, "metadata_store.json")
+EMBEDDINGS_FILE = os.path.join(_BASE_DIR, "metadata_embeddings.npy")
+INDEX_LITE_FILE = os.path.join(_BASE_DIR, "metadata_index_lite.json")
 
 USE_ML = False
 model = None
@@ -28,7 +29,7 @@ class MetadataService:
         self.embeddings = None
         self.model = None
 
-        if USE_ML:
+        if USE_ML and os.getenv("METADATA_ML_ENABLED", "true").lower() == "true":
             logger.info("Loading AI model (paraphrase-multilingual-MiniLM-L12-v2)...")
             try:
                 self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
@@ -130,34 +131,30 @@ class MetadataService:
         logger.info("Embeddings updated and saved.")
 
     def find_top_matches(self, user_query: str, top_k: int = 5):
-        if not self.metadata_index or self.embeddings is None:
+        if not self.metadata_index:
             return []
 
-        try:
-            if USE_ML and self.model:
+        if USE_ML and self.model and self.embeddings is not None:
+            try:
                 query_embedding = self.model.encode(user_query, convert_to_numpy=True)
-            else:
-                return self._find_top_matches_fallback(user_query, top_k)
+                scores = self._cosine_sim(query_embedding, self.embeddings)
+                top_indices = np.argsort(scores)[::-1][:top_k]
 
-            scores = self._cosine_sim(query_embedding, self.embeddings)
+                matches = []
+                for idx in top_indices:
+                    if scores[idx] >= 0.15:
+                        item = self.metadata_index[idx]
+                        matches.append({
+                            "name":    item["name"],
+                            "synonym": item["synonym"],
+                            "score":   float(scores[idx]),
+                            "fields":  item.get("fields", []),
+                        })
+                return matches
+            except Exception as e:
+                logger.error("Error in find_top_matches: %s", e)
 
-            top_indices = np.argsort(scores)[::-1][:top_k]
-
-            matches = []
-            for idx in top_indices:
-                if scores[idx] >= 0.15:
-                    item = self.metadata_index[idx]
-                    matches.append({
-                        "name":    item["name"],
-                        "synonym": item["synonym"],
-                        "score":   float(scores[idx]),
-                        "fields":  item.get("fields", []),
-                    })
-
-            return matches
-        except Exception as e:
-            logger.error("Error in find_top_matches: %s", e)
-            return []
+        return self._find_top_matches_fallback(user_query, top_k)
 
     def _cosine_sim(self, query_emb: np.ndarray, corpus_emb: np.ndarray) -> np.ndarray:
         query_norm = query_emb / np.linalg.norm(query_emb)

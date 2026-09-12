@@ -21,6 +21,12 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 MD_PATH = os.path.join(BASE, "Диплом_ИИ_ассистент_1С_полный_рерайт.md")
 FIGURES_DIR = os.path.join(BASE, "figures")
 OUT_PATH = os.path.join(BASE, "Диплом_ИИ_ассистент_1С_окончательный.docx")
+REFERENCE_TEMPLATE = os.path.join(
+    os.path.dirname(BASE),
+    "Вариант диплома который был на защите",
+    "release",
+    "Диплом_ИИ_ассистент_1С_окончательный_3.docx",
+)
 
 PAGE_WIDTH_CM = 21.0
 PAGE_HEIGHT_CM = 29.7
@@ -44,7 +50,12 @@ FIGURE_MAP = {
     "Рисунок 3.1": "fig_3_1.png",
     "Рисунок 3.2": "fig_3_2.png",
     "Рисунок 3.3": "fig_3_3.png",
-    "Рисунок 4.1": "fig_4_1.png",
+    "Рисунок 3.4": "screenshot_3_4.png",
+    "Рисунок 3.5": "screenshot_3_5.png",
+    "Рисунок 3.6": "screenshot_3_6.png",
+    "Рисунок 3.7": "screenshot_3_7.png",
+    "Рисунок 3.8": "screenshot_3_8.png",
+    "Рисунок 3.9": "screenshot_3_9.png",
 }
 
 FIRST_LINE_TWIPS = 709
@@ -243,9 +254,18 @@ def add_native_toc(doc):
     fldChar3.set(qn('w:fldCharType'), 'end')
     run5._element.append(fldChar3)
 
-    _add_page_break_before(p2)
-    p2_next = doc.add_paragraph(style='Ааа')
-    p2_next.paragraph_format.first_line_indent = Cm(0)
+    # The following level-one heading already starts on a new page.  Applying
+    # pageBreakBefore to the field itself would split the TOC heading and body.
+
+
+def enable_field_updates(doc):
+    """Ask Word to refresh TOC and other fields when the document opens."""
+    settings = doc.settings.element
+    update = settings.find(qn('w:updateFields'))
+    if update is None:
+        update = OxmlElement('w:updateFields')
+        settings.append(update)
+    update.set(qn('w:val'), 'true')
 
 
 def add_code_block(doc, code_text):
@@ -315,6 +335,14 @@ def parse_markdown(md_text):
         if stripped == '<!-- pagebreak -->' or stripped == '<pagebreak>':
             yield ('pagebreak', '', {})
             i += 1
+            continue
+
+        if stripped.startswith('<!--'):
+            while i < len(lines):
+                if '-->' in lines[i]:
+                    i += 1
+                    break
+                i += 1
             continue
 
         if stripped == 'СОДЕРЖАНИЕ':
@@ -529,11 +557,7 @@ def build_docx():
     # Remove control characters that are invalid in XML (like form-feed or vertical tabs)
     md = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', md)
 
-    template_candidates = [
-        os.path.join(BASE, "template.docx"),
-        os.path.join(BASE, "Диплом_ИИ_ассистент_1С_окончательный.docx"),
-        os.path.join(os.path.dirname(BASE), "release", "text", "Диплом_ИИ_ассистент_1С_окончательный.docx")
-    ]
+    template_candidates = [REFERENCE_TEMPLATE]
     template_path = None
     for cand in template_candidates:
         if os.path.exists(cand):
@@ -548,12 +572,17 @@ def build_docx():
         doc = Document()
     
     print("Clearing template body...")
-    for p in list(doc.paragraphs):
-        p._element.getparent().remove(p._element)
-    for t in list(doc.tables):
-        t._element.getparent().remove(t._element)
+    # Remove every body child, including content controls that may contain the
+    # old TOC.  Keep sectPr so page geometry and header/footer relationships
+    # inherited from the defended document remain intact.
+    body = doc._element.body
+    for child in list(body):
+        if child.tag != qn('w:sectPr'):
+            body.remove(child)
 
     setup_styles(doc)
+    set_page_size(doc)
+    enable_field_updates(doc)
 
     toc_inserted = False
 
@@ -680,30 +709,8 @@ def build_docx():
         doc.save(save_path)
         print(f"Original locked, saved as: {save_path}")
 
-    import shutil
-    release_path = os.path.join(
-        os.path.dirname(BASE), "release", "text",
-        "Диплом_ИИ_ассистент_1С_окончательный.docx"
-    )
-    desktop_path = r"C:\Users\kobza\Desktop\Диплом_ИИ_ассистент_1С_окончательный.docx"
-    
-    # Try copying to release
-    try:
-        shutil.copy2(save_path, release_path)
-        print("Copied to release")
-    except PermissionError:
-        v2 = release_path.replace('.docx', '_v2.docx')
-        shutil.copy2(save_path, v2)
-        print(f"Original locked, saved as _v2.docx")
-        
-    # Try copying to Desktop
-    try:
-        shutil.copy2(save_path, desktop_path)
-        print(f"Copied to Desktop: {desktop_path}")
-    except PermissionError:
-        desktop_v2 = desktop_path.replace('.docx', '_v2.docx')
-        shutil.copy2(save_path, desktop_v2)
-        print(f"Desktop locked, saved as {desktop_v2}")
+    # release/ and the desktop are publication destinations, not build outputs.
+    # They are intentionally left untouched unless packaging is requested.
 
 
 if __name__ == '__main__':

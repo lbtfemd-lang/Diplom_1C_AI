@@ -12,6 +12,7 @@ services:
     environment:
       - MIDDLEWARE_HOST=0.0.0.0
       - MIDDLEWARE_PORT=8080
+      - SQLITE_DB_PATH=/app/data/kanban.db
     volumes:
       - middleware_data:/app/data
     healthcheck:

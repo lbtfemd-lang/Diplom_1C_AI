@@ -67,7 +67,7 @@ def _seed(session):
             username="1c_service",
             password_hash=auth_mod.pwd_context.hash("1c_service_2024"),
             full_name="1С:Предприятие (сервисный аккаунт)",
-            role="admin",
+            role="service_bridge",
             department_id=depts[0].id,
             avatar_color="#6366f1",
             is_active=True,
@@ -167,10 +167,10 @@ class Test1CServiceAccount:
         body = resp.json()
         assert "access_token" in body
 
-    def test_1c_service_has_admin_role(self, client, service_headers):
+    def test_1c_service_has_service_bridge_role(self, client, service_headers):
         resp = client.get("/auth/me", headers=service_headers)
         assert resp.status_code == 200
-        assert resp.json()["role"] == "admin"
+        assert resp.json()["role"] == "service_bridge"
 
     def test_wrong_1c_service_password_fails(self, client):
         resp = client.post(
@@ -240,6 +240,152 @@ class Test1CChatContext:
             headers=service_headers,
         )
         assert resp.status_code == 200
+
+    def test_chat_acting_user_least_privilege_and_provider_metadata(self, client, service_headers, monkeypatch):
+        captured_role = []
+
+        async def stub_generate(messages, context="", actions=None, user_role="employee"):
+            captured_role.append(user_role)
+            return {
+                "text": "Ответ для менеджера",
+                "action": None,
+                "data": None,
+                "provider_used": "gigachat",
+                "is_fallback": False,
+                "model_name": "GigaChat-Pro",
+            }
+
+        import app.services.llm_service as llm_mod
+        monkeypatch.setattr(llm_mod.llm_service, "generate_response", stub_generate)
+
+        # Сервисный JWT не удостоверяет личность указанного в заголовке менеджера.
+        headers = {
+            **service_headers,
+            "X-1C-User-Name": "ivanov",
+        }
+        resp = client.post(
+            "/chat",
+            json={"messages": [{"role": "user", "text": "План продаж"}], "user_identity": "ivanov"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["provider_used"] == "gigachat"
+        assert data["is_fallback"] is False
+        assert data["model_name"] == "GigaChat-Pro"
+        assert captured_role == ["employee"]
+
+    @pytest.mark.parametrize("claimed_name", ["admin", "ivanov"])
+    def test_bridge_cannot_impersonate_existing_account(self, client, service_headers, monkeypatch, claimed_name):
+        from main import llm_service
+        roles = []
+
+        async def capture(messages, context="", user_role="employee"):
+            roles.append(user_role)
+            return {"text": "ok", "action": None, "data": None}
+
+        monkeypatch.setattr(llm_service, "generate_response", capture)
+        response = client.post("/chat", headers={**service_headers, "X-1C-User-Name": claimed_name},
+            json={"messages": [{"role": "user", "text": "test"}], "user_identity": claimed_name, "user_role": "admin"})
+        assert response.status_code == 200
+        assert roles == ["employee"]
+
+    def test_personal_jwt_preserves_manager_role(self, client, monkeypatch):
+        from main import llm_service
+        roles = []
+
+        async def capture(messages, context="", user_role="employee"):
+            roles.append(user_role)
+            return {"text": "ok", "action": None, "data": None}
+
+        monkeypatch.setattr(llm_service, "generate_response", capture)
+        login = client.post("/auth/login", json={"username": "ivanov", "password": "123456"})
+        response = client.post("/chat", headers={"X-Auth-Token": login.json()["access_token"], "X-1C-User-Name": "admin"},
+            json={"messages": [{"role": "user", "text": "test"}], "user_role": "admin"})
+        assert response.status_code == 200
+        assert roles == ["manager"]
+
+    def test_chat_role_header_cannot_escalate_privileges(self, client, service_headers, monkeypatch):
+        """Заголовок X-1C-User-Role не должен повышать привилегии.
+
+        Регрессия на уязвимость обхода RBAC: раньше роль принималась из заголовка
+        как есть, и держатель токена service_bridge мог объявить себя director,
+        получив доступ к финансовым регистрам.
+        """
+        captured_role = []
+
+        async def stub_generate(messages, context="", actions=None, user_role="employee"):
+            captured_role.append(user_role)
+            return {"text": "ok", "action": None, "data": None}
+
+        import app.services.llm_service as llm_mod
+        monkeypatch.setattr(llm_mod.llm_service, "generate_response", stub_generate)
+
+        # `sidorova` (employee) заявляет себя директором через заголовок и тело запроса
+        resp = client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "text": "Остатки денег"}],
+                "user_identity": "sidorova",
+                "user_role": "director",
+            },
+            headers={**service_headers, "X-1C-User-Name": "sidorova", "X-1C-User-Role": "director"},
+        )
+        assert resp.status_code == 200
+        assert captured_role == ["employee"], "Роль из заголовка не должна повышать привилегии"
+
+    def test_chat_unknown_bridge_user_downgraded_to_employee(self, client, service_headers, monkeypatch):
+        """Неизвестный пользователь из 1С получает минимальные права, а не заявленные."""
+        captured_role = []
+
+        async def stub_generate(messages, context="", actions=None, user_role="employee"):
+            captured_role.append(user_role)
+            return {"text": "ok", "action": None, "data": None}
+
+        import app.services.llm_service as llm_mod
+        monkeypatch.setattr(llm_mod.llm_service, "generate_response", stub_generate)
+
+        resp = client.post(
+            "/chat",
+            json={"messages": [{"role": "user", "text": "Кассовый разрыв"}]},
+            headers={**service_headers, "X-1C-User-Name": "nonexistent_user", "X-1C-User-Role": "cfo"},
+        )
+        assert resp.status_code == 200
+        assert captured_role == ["employee"]
+
+
+# =============================================================================
+# Синхронизация финансовых срезов из 1С
+# =============================================================================
+
+
+class Test1CFinancialSnapshotSync:
+    def test_sync_financial_snapshot_and_live_monitor(self, client, service_headers, admin_headers):
+        # 1. Verify monitor can accept live 1C registers
+        live_payload = {
+            "source": "1С:УНФ 3.0 (Рабочая ИБ)",
+            "kpi": {
+                "cash_balance": 15000000.0,
+                "cash_gap": 0.0,
+                "liquidity_reserve": 14000000.0,
+            },
+            "creditors": [],
+            "dead_stock": [],
+        }
+        sync_resp = client.post(
+            "/analytics/1c/sync-financial-snapshot",
+            json=live_payload,
+            headers=service_headers,
+        )
+        assert sync_resp.status_code == 200
+        assert sync_resp.json()["status"] == "ok"
+
+        # 2. Monitor now serves live_1c_sync
+        m2 = client.get("/analytics/monitor", headers=admin_headers)
+        assert m2.status_code == 200
+        assert m2.json()["mode"] == "live_1c_sync"
+        assert m2.json()["is_mock_data"] is False
+        assert m2.json()["kpi"]["cash_balance"] == 15000000.0
 
 
 # =============================================================================

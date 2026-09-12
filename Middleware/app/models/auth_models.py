@@ -5,8 +5,17 @@ from enum import Enum
 
 class UserRole(str, Enum):
     ADMIN = "admin"
+    DIRECTOR = "director"
+    CFO = "cfo"
     MANAGER = "manager"
+    WAREHOUSE = "warehouse"
     EMPLOYEE = "employee"
+    SERVICE_BRIDGE = "service_bridge"
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 
 class LoginRequest(BaseModel):

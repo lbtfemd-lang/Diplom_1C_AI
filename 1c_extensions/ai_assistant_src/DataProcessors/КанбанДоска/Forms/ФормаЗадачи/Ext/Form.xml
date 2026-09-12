@@ -39,6 +39,9 @@
 			<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="12"/>
 		</InputField>
 		<InputField name="Контрагент" id="13">
+			<Events>
+				<Event name="OnChange">КонтрагентПриИзменении</Event>
+			</Events>
 			<DataPath>Контрагент</DataPath>
 			<Title>
 				<v8:item>
@@ -54,6 +57,9 @@
 			<ExtendedTooltip name="КонтрагентРасширеннаяПодсказка" id="15"/>
 		</InputField>
 		<InputField name="ЗаказПокупателя" id="16">
+			<Events>
+				<Event name="OnChange">ЗаказПокупателяПриИзменении</Event>
+			</Events>
 			<DataPath>ЗаказПокупателя</DataPath>
 			<Title>
 				<v8:item>
@@ -141,7 +147,7 @@
 	<Attributes>
 		<Attribute name="Объект" id="1">
 			<Type>
-				<v8:Type>cfg:ExternalDataProcessorObject.КанбанДоска</v8:Type>
+				<v8:Type>cfg:DataProcessorObject.КанбанДоска</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
@@ -174,22 +180,22 @@
 		</Attribute>
 		<Attribute name="Контрагент" id="5">
 			<Type>
-				<v8:Type>cfg:CatalogRef.Контрагенты</v8:Type>
+				<v8:Type>cfg:AnyRef</v8:Type>
 			</Type>
 		</Attribute>
 		<Attribute name="ЗаказПокупателя" id="6">
 			<Type>
-				<v8:Type>cfg:DocumentRef.ЗаказПокупателя</v8:Type>
+				<v8:Type>cfg:AnyRef</v8:Type>
 			</Type>
 		</Attribute>
 		<Attribute name="Исполнитель" id="7">
 			<Type>
-				<v8:Type>cfg:CatalogRef.Пользователи</v8:Type>
+				<v8:Type>cfg:AnyRef</v8:Type>
 			</Type>
 		</Attribute>
 		<Attribute name="Важность" id="8">
 			<Type>
-				<v8:Type>cfg:EnumRef.ВариантыВажностиЗадачи</v8:Type>
+				<v8:Type>cfg:AnyRef</v8:Type>
 			</Type>
 		</Attribute>
 		<Attribute name="СрокИсполнения" id="9">

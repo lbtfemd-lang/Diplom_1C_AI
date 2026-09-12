@@ -81,3 +81,32 @@ class TestDepartments:
         emp_tok = client.post("/auth/login", json={"username": "emp2", "password": "test123"}).json()["access_token"]
         resp = client.post("/departments", json={"name": "Nope"}, headers={"X-Auth-Token": emp_tok})
         assert resp.status_code == 403
+
+
+class TestPasswordSecurity:
+    def test_no_hardcoded_admin_bypass(self, client):
+        # Admin is seeded with hash of "admin" in conftest.
+        # Previously, "admin123" was allowed as hardcoded bypass.
+        # Now, only exact hash match must succeed.
+        resp_bypass = client.post("/auth/login", json={"username": "admin", "password": "admin123"})
+        assert resp_bypass.status_code == 401
+
+        resp_exact = client.post("/auth/login", json={"username": "admin", "password": "admin"})
+        assert resp_exact.status_code == 200
+
+    def test_change_password_flow(self, client, admin_headers):
+        resp = client.post(
+            "/auth/change-password",
+            json={"old_password": "admin", "new_password": "NewAdminPass2026!"},
+            headers=admin_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+        # Old password must now fail
+        resp_old = client.post("/auth/login", json={"username": "admin", "password": "admin"})
+        assert resp_old.status_code == 401
+
+        # New password must succeed
+        resp_new = client.post("/auth/login", json={"username": "admin", "password": "NewAdminPass2026!"})
+        assert resp_new.status_code == 200

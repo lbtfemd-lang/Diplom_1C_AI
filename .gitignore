@@ -18,7 +18,10 @@ env/
 
 # Database
 *.db
+*.db*
 *.sqlite3
+*.sqlite3*
+telegram_chats.json
 
 # ML artifacts
 *.npy
@@ -55,6 +58,7 @@ release/
 text/figures_backup/
 *копия*
 *рерайт*
+!text/*_рерайт.md
 *_fixed*
 
 # Local/generated release data
@@ -79,3 +83,13 @@ metadata_index_lite.json
 .pytest_cache/
 _pytest_tmp/
 .pytest_tmp/
+
+# Tools & Local Web Server (dist in tools/apache24.zip)
+tools/apache24/
+
+# Scratch & Temporary development artifacts
+scratch/
+-Format/
+archive/dumps/
+*.wav
+text/archive_pre_defense_sync/

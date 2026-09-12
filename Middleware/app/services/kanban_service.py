@@ -16,8 +16,20 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, B
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from typing import List, Optional, Dict
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "kanban.db")
+from app.core.db import enable_sqlite_wal
+
+def get_sqlite_db_path() -> str:
+    env_path = os.getenv("SQLITE_DB_PATH")
+    if env_path:
+        p = os.path.abspath(env_path)
+    else:
+        p = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "kanban.db"))
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    return p
+
+DB_PATH = get_sqlite_db_path()
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, connect_args={"check_same_thread": False})
+enable_sqlite_wal(engine)
 SessionLocal = sessionmaker(bind=engine)
 class Base(DeclarativeBase):
     pass
@@ -150,6 +162,26 @@ class KanbanService:
         finally:
             session.close()
 
+    @staticmethod
+    def _visible_tasks(q, role, department_id, username):
+        if role in ("admin", "director", "cfo"):
+            return q
+        if role not in ("employee", "service_bridge", "manager", "warehouse") or not username:
+            return q.filter(False)
+        own = or_(KanbanTaskDB.assignee == username, KanbanTaskDB.created_by == username)
+        if role in ("manager", "warehouse") and department_id is not None:
+            return q.filter(or_(own, KanbanTaskDB.department_id == department_id))
+        return q.filter(own)
+
+    def can_access_task(self, task_id, user):
+        session = self._get_session()
+        try:
+            q = session.query(KanbanTaskDB).filter_by(id=task_id)
+            return self._visible_tasks(q, user.get("role"), user.get("department_id"),
+                                       user.get("username")).first() is not None
+        finally:
+            session.close()
+
     def get_tasks_for_user(self, user_id: int, role: str, department_id: int = None,
                            username: str = None, filter_dept: int = None,
                            filter_assignee: str = None, filter_priority: str = None) -> List[dict]:
@@ -157,21 +189,7 @@ class KanbanService:
         try:
             q = session.query(KanbanTaskDB)
 
-            if role == "employee" and username:
-                q = q.filter(
-                    or_(
-                        KanbanTaskDB.assignee == username,
-                        KanbanTaskDB.created_by == username,
-                    )
-                )
-            elif role == "manager" and department_id:
-                q = q.filter(
-                    or_(
-                        KanbanTaskDB.department_id == department_id,
-                        KanbanTaskDB.assignee == username,
-                        KanbanTaskDB.created_by == username,
-                    )
-                )
+            q = self._visible_tasks(q, role, department_id, username)
 
             if filter_dept is not None:
                 q = q.filter(KanbanTaskDB.department_id == filter_dept)
@@ -273,18 +291,7 @@ class KanbanService:
         try:
             q = session.query(KanbanTaskDB)
 
-            if role == "employee" and username:
-                q = q.filter(
-                    or_(KanbanTaskDB.assignee == username, KanbanTaskDB.created_by == username)
-                )
-            elif role == "manager" and department_id:
-                q = q.filter(
-                    or_(
-                        KanbanTaskDB.department_id == department_id,
-                        KanbanTaskDB.assignee == username,
-                        KanbanTaskDB.created_by == username,
-                    )
-                )
+            q = self._visible_tasks(q, role, department_id, username)
 
             tasks = q.all()
 
@@ -330,10 +337,7 @@ class KanbanService:
         try:
             q = session.query(KanbanTaskDB)
 
-            if role == "employee":
-                q = q.filter(KanbanTaskDB.assignee == username)
-            elif role == "manager" and department_id:
-                q = q.filter(KanbanTaskDB.department_id == department_id)
+            q = self._visible_tasks(q, role, department_id, username)
 
             tasks = q.order_by(KanbanTaskDB.created_at.desc()).limit(limit).all()
             return [

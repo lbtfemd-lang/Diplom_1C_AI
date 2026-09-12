@@ -1,5 +1,6 @@
-// =============================================================================
+﻿// =============================================================================
 // Канбан-доска — 100% нативное решение 1С:Предприятие
+// Хранение данных: Задача.ЗадачаИсполнителя / Справочник.Контрагенты / Документы
 // =============================================================================
 
 &НаСервере
@@ -14,42 +15,19 @@
     КонецЕсли;
 КонецПроцедуры
 
+// =============================================================================
+// ОБРАБОТЧИКИ КОМАНД ФОРМЫ (Кнопки в шапке 1С)
+// =============================================================================
+
 &НаКлиенте
-Процедура ОбработкаОповещения(ИмяСобытия, Параметр, Источник)
+Процедура ОбновитьНажатие(Команда)
     ОбновитьДоску();
 КонецПроцедуры
 
-// =============================================================================
-// ОТКРЫТИЕ ФОРМЫ РЕДАКТИРОВАНИЯ И СОЗДАНИЯ ЗАДАЧИ
-// =============================================================================
-
 &НаКлиенте
-Процедура ОткрытьФормуЗадачи(КлючУИД = "")
+Процедура СоздатьЗадачуНажатие(Команда)
     ПараметрыФормы = Новый Структура;
-    Если ЗначениеЗаполнено(КлючУИД) Тогда
-        ПараметрыФормы.Вставить("Ключ", КлючУИД);
-    КонецЕсли;
-    
-    // Динамическое определение точного пути к ФормаЗадачи
-    ИндПервойТочки = СтрНайти(ЭтотОбъект.ИмяФормы, ".");
-    ИндВторойТочки = ?(ИндПервойТочки > 0, СтрНайти(ЭтотОбъект.ИмяФормы, ".", , ИндПервойТочки + 1), 0);
-    Если ИндВторойТочки > 0 Тогда
-        ПрефиксОбъекта = Лев(ЭтотОбъект.ИмяФормы, ИндВторойТочки - 1);
-    Иначе
-        ПрефиксОбъекта = "Обработка.КанбанДоска";
-    КонецЕсли;
-    
-    ИмяФормыЗадачи = ПрефиксОбъекта + ".Форма.ФормаЗадачи";
-    
-    Попытка
-        ОткрытьФорму(ИмяФормыЗадачи, ПараметрыФормы, ЭтотОбъект);
-    Исключение
-        Попытка
-            ОткрытьФорму("Обработка.КанбанДоска.Форма.ФормаЗадачи", ПараметрыФормы, ЭтотОбъект);
-        Исключение
-            ПоказатьПредупреждение(, "Не удалось открыть форму задачи: " + ОписаниеОшибки());
-        КонецПопытки;
-    КонецПопытки;
+    ОткрытьФорму("Задача.ЗадачаИсполнителя.ФормаОбъекта", ПараметрыФормы, ЭтотОбъект);
 КонецПроцедуры
 
 // =============================================================================
@@ -64,11 +42,13 @@
 &НаСервере
 Функция ПолучитьДоску1СНаСервере()
     Попытка
-        // ПроверитьИИнициализироватьЗадачи1С();
+        // 1. Инициализация демонстрационных задач в 1С при первом открытии
+        ПроверитьИИнициализироватьЗадачи1С();
         
+        // 2. Получение списка задач запросом к Задача.ЗадачаИсполнителя
         Запрос = Новый Запрос;
         Запрос.Текст = 
-            "ВЫБРАТЬ
+            "ВЫБРАТЬ РАЗРЕШЕННЫЕ
             |   Задача.Ссылка КАК Ссылка,
             |   Задача.Номер КАК Номер,
             |   Задача.Наименование КАК Заголовок,
@@ -100,9 +80,11 @@
             СтруктураЗ.Вставить("title", СокрЛП(Выборка.Заголовок));
             СтруктураЗ.Вставить("description", СокрЛП(Выборка.Описание));
             
+            // Определение колонки
+            ТекстОписания = СокрЛП(Выборка.Описание);
             Если Выборка.Выполнена Тогда
                 Колонка = "done";
-            ИначеЕсли Выборка.Важность = Перечисления.ВариантыВажностиЗадачи.Высокая И Выборка.ПринятаКИсполнению Тогда
+            ИначеЕсли СтрНайти(ТекстОписания, "[Статус: На проверке]") > 0 И Выборка.ПринятаКИсполнению Тогда
                 Колонка = "review";
             ИначеЕсли Выборка.ПринятаКИсполнению Тогда
                 Колонка = "in_progress";
@@ -111,6 +93,7 @@
             КонецЕсли;
             СтруктураЗ.Вставить("column", Колонка);
             
+            // Важность
             Если Выборка.Важность = Перечисления.ВариантыВажностиЗадачи.Высокая Тогда
                 Приор = "high";
             ИначеЕсли Выборка.Важность = Перечисления.ВариантыВажностиЗадачи.Низкая Тогда
@@ -137,7 +120,12 @@
             МассивЗадач.Добавить(СтруктураЗ);
         КонецЦикла;
         
-        Возврат СгенерироватьКанбанHTML(МассивЗадач);
+        // 3. Получение списков реальных метаданных 1С для формы создания задачи
+        СписокКонтрагентов = ПолучитьСписокКонтрагентов1С();
+        СписокИсполнителей = ПолучитьСписокИсполнителей1С();
+        СписокЗаказов = ПолучитьСписокЗаказов1С();
+        
+        Возврат СгенерироватьКанбанHTML(МассивЗадач, СписокКонтрагентов, СписокИсполнителей, СписокЗаказов);
     Исключение
         Возврат "<html><body style='font-family:sans-serif;padding:20px;color:#b91c1c;background:#fff5f5;'>"
             + "<h3>Ошибка загрузки задач 1С:</h3>"
@@ -147,9 +135,90 @@
 КонецФункции
 
 &НаСервере
+Функция ПолучитьСписокКонтрагентов1С()
+    Массив = Новый Массив;
+    Попытка
+        Запрос = Новый Запрос(
+            "ВЫБРАТЬ Ссылка, Наименование, ИНН 
+            |ИЗ Справочник.Контрагенты 
+            |ГДЕ НЕ ПометкаУдаления И НЕ ЭтоГруппа 
+            |УПОРЯДОЧИТЬ ПО Наименование");
+        Выборка = Запрос.Выполнить().Выбрать();
+        Пока Выборка.Следующий() Цикл
+            Массив.Добавить(Новый Структура("Ref, Name, INN", 
+                Строка(Выборка.Ссылка.УникальныйИдентификатор()), 
+                СокрЛП(Выборка.Наименование), 
+                СокрЛП(Выборка.ИНН)));
+        КонецЦикла;
+    Исключение КонецПопытки;
+    Возврат Массив;
+КонецФункции
+
+&НаСервере
+Функция ПолучитьСписокИсполнителей1С()
+    Массив = Новый Массив;
+    Попытка
+        Запрос = Новый Запрос(
+            "ВЫБРАТЬ Ссылка, Наименование 
+            |ИЗ Справочник.Пользователи 
+            |ГДЕ НЕ ПометкаУдаления 
+            |УПОРЯДОЧИТЬ ПО Наименование");
+        Выборка = Запрос.Выполнить().Выбрать();
+        Пока Выборка.Следующий() Цикл
+            Массив.Добавить(Новый Структура("Ref, Name", 
+                Строка(Выборка.Ссылка.УникальныйИдентификатор()), 
+                СокрЛП(Выборка.Наименование)));
+        КонецЦикла;
+    Исключение КонецПопытки;
+    Возврат Массив;
+КонецФункции
+
+&НаСервере
+Функция ПолучитьСписокЗаказов1С()
+    Массив = Новый Массив;
+    Попытка
+        Запрос = Новый Запрос(
+            "ВЫБРАТЬ ПЕРВЫЕ 30
+            |   Заказ.Ссылка КАК Ссылка,
+            |   Заказ.Номер КАК Номер,
+            |   Заказ.Дата КАК Дата,
+            |   Заказ.СуммаДокумента КАК Сумма,
+            |   ПРЕДСТАВЛЕНИЕ(Заказ.Контрагент) КАК Контрагент
+            |ИЗ
+            |   Документ.ЗаказПокупателя КАК Заказ
+            |ГДЕ
+            |   НЕ Заказ.ПометкаУдаления
+            |УПОРЯДОЧИТЬ ПО
+            |   Заказ.Дата УБЫВ");
+        Выборка = Запрос.Выполнить().Выбрать();
+        Пока Выборка.Следующий() Цикл
+            Текст = "Заказ №" + СокрЛП(Выборка.Номер) + " от " + Формат(Выборка.Дата, "ДФ=dd.MM.yyyy") + " (" + СокрЛП(Выборка.Контрагент) + ", " + Формат(Выборка.Сумма, "ЧДЦ=2") + " руб.)";
+            Массив.Добавить(Новый Структура("Ref, Name", 
+                Строка(Выборка.Ссылка.УникальныйИдентификатор()), 
+                Текст));
+        КонецЦикла;
+    Исключение КонецПопытки;
+    Возврат Массив;
+КонецФункции
+
+&НаСервере
 Процедура ПроверитьИИнициализироватьЗадачи1С()
-    // Автоматическое пересоздание отключено, чтобы удаленные задачи не восстанавливались
-    Возврат;
+    Попытка
+        Запрос = Новый Запрос("ВЫБРАТЬ ПЕРВЫЕ 1 Задача.Ссылка ИЗ Задача.ЗадачаИсполнителя КАК Задача ГДЕ НЕ Задача.ПометкаУдаления");
+        Если НЕ Запрос.Выполнить().Пустой() Тогда
+            Возврат;
+        КонецЕсли;
+        
+        КонтрагентАльфа = Справочники.Контрагенты.НайтиПоНаименованию("АЛЬФАМАРТ", Ложь);
+        Если Не ЗначениеЗаполнено(КонтрагентАльфа) Тогда
+            КонтрагентАльфа = Справочники.Контрагенты.НайтиПоНаименованию("Альфа", Ложь);
+        КонецЕсли;
+        
+        СоздатьДемоЗадачу("Подготовить коммерческое предложение", "Сформировать КП на мониторы и оргтехнику", КонтрагентАльфа, Перечисления.ВариантыВажностиЗадачи.Обычная, Ложь, Ложь);
+        СоздатьДемоЗадачу("Проверить складские остатки", "Сверить остатки товара Монитор на основном складе", Неопределено, Перечисления.ВариантыВажностиЗадачи.Высокая, Истина, Ложь);
+        СоздатьДемоЗадачу("Согласовать договор поставки", "Проверить реквизиты и согласовать проект договора", КонтрагентАльфа, Перечисления.ВариантыВажностиЗадачи.Высокая, Истина, Ложь);
+        СоздатьДемоЗадачу("Отгрузить заказ покупателя", "Провести документ отгрузки и передать на склад", КонтрагентАльфа, Перечисления.ВариантыВажностиЗадачи.Обычная, Истина, Истина);
+    Исключение КонецПопытки;
 КонецПроцедуры
 
 &НаСервере
@@ -169,33 +238,25 @@
             НоваяЗадача.ДатаИсполнения = ТекущаяДата();
         КонецЕсли;
         НоваяЗадача.СрокИсполнения = ТекущаяДата() + 86400 * 2;
-        
-        Попытка
-            НоваяЗадача.Исполнитель = Пользователи.АвторизованныйПользователь();
-        Исключение
-            НоваяЗадача.Исполнитель = Справочники.Пользователи.НайтиПоНаименованию("Администратор");
-        КонецПопытки;
-        
-        НоваяЗадача.ОбменДанными.Загрузка = Истина;
         НоваяЗадача.Записать();
     Исключение КонецПопытки;
 КонецПроцедуры
 
 &НаСервере
-Функция СгенерироватьКанбанHTML(МассивЗадач)
+Функция СгенерироватьКанбанHTML(МассивЗадач, СписокКонтрагентов, СписокИсполнителей, СписокЗаказов)
     Колонки = Новый Массив;
-    Колонки.Добавить(Новый Структура("id, name, color, badge", "todo", "К выполнению", "#3b82f6", "bg-blue"));
-    Колонки.Добавить(Новый Структура("id, name, color, badge", "in_progress", "В работе", "#f59e0b", "bg-amber"));
-    Колонки.Добавить(Новый Структура("id, name, color, badge", "review", "На проверке", "#a855f7", "bg-purple"));
-    Колонки.Добавить(Новый Структура("id, name, color, badge", "done", "Готово", "#10b981", "bg-emerald"));
+    Колонки.Добавить(Новый Структура("id, name, color, badge", "todo", "К выполнению", "#2563eb", "bg-blue"));
+    Колонки.Добавить(Новый Структура("id, name, color, badge", "in_progress", "В работе", "#d97706", "bg-amber"));
+    Колонки.Добавить(Новый Структура("id, name, color, badge", "review", "На проверке", "#7c3aed", "bg-purple"));
+    Колонки.Добавить(Новый Структура("id, name, color, badge", "done", "Готово", "#059669", "bg-emerald"));
     
+    // Векторные SVG иконки
     IconBoard = "<svg width=""16"" height=""16"" viewBox=""0 0 24 24"" fill=""none"" stroke=""#f59e0b"" stroke-width=""2"" style=""vertical-align:middle;margin-right:6px;""><rect x=""3"" y=""3"" width=""18"" height=""18"" rx=""2"" ry=""2""></rect><line x1=""9"" y1=""3"" x2=""9"" y2=""21""></line><line x1=""15"" y1=""3"" x2=""15"" y2=""21""></line></svg>";
     IconUser = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><path d=""M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2""></path><circle cx=""12"" cy=""7"" r=""4""></circle></svg>";
-    IconBuilding = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""#60a5fa"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><rect x=""4"" y=""2"" width=""16"" height=""20"" rx=""2"" ry=""2""></rect><path d=""M9 22v-4h6v4""></path><path d=""M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01""></path></svg>";
+    IconBuilding = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""#2563eb"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><rect x=""4"" y=""2"" width=""16"" height=""20"" rx=""2"" ry=""2""></rect><path d=""M9 22v-4h6v4""></path><path d=""M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01""></path></svg>";
     IconCalendar = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><rect x=""3"" y=""4"" width=""18"" height=""18"" rx=""2"" ry=""2""></rect><line x1=""16"" y1=""2"" x2=""16"" y2=""6""></line><line x1=""8"" y1=""2"" x2=""8"" y2=""6""></line><line x1=""3"" y1=""10"" x2=""21"" y2=""10""></line></svg>";
     IconRefresh = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><polyline points=""23 4 23 10 17 10""></polyline><path d=""M20.49 15a9 9 0 1 1-2.12-9.36L23 10""></path></svg>";
     IconPlus = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><line x1=""12"" y1=""5"" x2=""12"" y2=""19""></line><line x1=""5"" y1=""12"" x2=""19"" y2=""12""></line></svg>";
-    IconTheme = "<svg width=""12"" height=""12"" viewBox=""0 0 24 24"" fill=""none"" stroke=""currentColor"" stroke-width=""2"" style=""vertical-align:middle;margin-right:4px;""><path d=""M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z""></path></svg>";
 
     СтолбцыHTML = "";
     ВсегоЗадач = 0;
@@ -219,6 +280,7 @@
             DueDate = З.due_date;
             IsOverdue = З.is_overdue;
             
+            // Бейдж приоритета
             Если З.priority = "high" Тогда
                 ПриорHTML = "<span class=""priority-badge priority-high"">Высокий</span>";
             ИначеЕсли З.priority = "low" Тогда
@@ -227,41 +289,42 @@
                 ПриорHTML = "<span class=""priority-badge priority-med"">Средний</span>";
             КонецЕсли;
             
+            // Тег предмета (Контрагент/Документ)
             ПредметHTML = "";
             Если Не ПустаяСтрока(Subject) Тогда
                 ПредметHTML = "<div class=""task-subject"" title=""Предмет в 1С"">" + IconBuilding + Subject + "</div>";
             КонецЕсли;
             
+            // Дата дедлайна
             ДедлайнHTML = "";
             Если Не ПустаяСтрока(DueDate) Тогда
                 КлассДедлайн = ?(IsOverdue, "task-date overdue", "task-date");
                 ДедлайнHTML = "<div class=""" + КлассДедлайн + """>" + IconCalendar + DueDate + ?(IsOverdue, " (просрочено!)", "") + "</div>";
             КонецЕсли;
             
-            КнопкиДействий = "<div class=""card-actions"">";
+            // Кнопки быстрых действий на карточке
+            КнопкиДействий = "<div class=""card-actions"">"
+                + "<a href=""v8action://openIn1C?ref=" + Ref + """ class=""act-btn"" title=""Открыть в 1С"">📄 1С</a>";
             
             Если Колонка.id = "todo" Тогда
-                КнопкиДействий = КнопкиДействий + "<a href=""#moveTask?ref=" + Ref + "&to=in_progress"" class=""act-btn act-primary"" title=""Взять в работу"">▶ В работу</a>";
+                КнопкиДействий = КнопкиДействий + "<a href=""v8action://moveTask?ref=" + Ref + "&to=in_progress"" class=""act-btn act-primary"" title=""Взять в работу"">▶ В работу</a>";
             ИначеЕсли Колонка.id = "in_progress" Тогда
-                КнопкиДействий = КнопкиДействий + "<a href=""#moveTask?ref=" + Ref + "&to=review"" class=""act-btn act-purple"" title=""Передать на проверку"">⏳ Проверить</a>";
-                КнопкиДействий = КнопкиДействий + "<a href=""#moveTask?ref=" + Ref + "&to=done"" class=""act-btn act-success"" title=""Завершить задачу"">✓ Готово</a>";
+                КнопкиДействий = КнопкиДействий + "<a href=""v8action://moveTask?ref=" + Ref + "&to=done"" class=""act-btn act-success"" title=""Завершить задачу"">✓ Готово</a>";
             ИначеЕсли Колонка.id = "review" Тогда
-                КнопкиДействий = КнопкиДействий + "<a href=""#moveTask?ref=" + Ref + "&to=done"" class=""act-btn act-success"" title=""Утвердить и завершить"">✓ Готово</a>";
-                КнопкиДействий = КнопкиДействий + "<a href=""#moveTask?ref=" + Ref + "&to=in_progress"" class=""act-btn"" title=""Вернуть на доработку"">↺ В работу</a>";
+                КнопкиДействий = КнопкиДействий + "<a href=""v8action://moveTask?ref=" + Ref + "&to=done"" class=""act-btn act-success"" title=""Утвердить и завершить"">✓ Готово</a>";
             ИначеЕсли Колонка.id = "done" Тогда
-                КнопкиДействий = КнопкиДействий + "<a href=""#moveTask?ref=" + Ref + "&to=todo"" class=""act-btn"" title=""Вернуть к выполнению"">↺ Вернуть</a>";
+                КнопкиДействий = КнопкиДействий + "<a href=""v8action://moveTask?ref=" + Ref + "&to=todo"" class=""act-btn"" title=""Вернуть к выполнению"">↺ Вернуть</a>";
             КонецЕсли;
             
-            КнопкиДействий = КнопкиДействий + "<a href=""#openIn1C?ref=" + Ref + """ class=""act-btn"" title=""Открыть задачу в форме 1С"">✏️ 1С</a>";
-            КнопкиДействий = КнопкиДействий + "<a href=""#deleteTask?ref=" + Ref + """ class=""act-btn act-danger"" title=""Удалить задачу в 1С"">🗑</a></div>";
+            КнопкиДействий = КнопкиДействий + "<a href=""v8action://deleteTask?ref=" + Ref + """ class=""act-btn act-danger"" title=""Удалить задачу"" onclick=""return confirm('Удалить задачу #" + Id + "?')"">🗑</a></div>";
             
             ЗадачиКолонки = ЗадачиКолонки
-                + "<div class=""task-card"">"
+                + "<div class=""task-card"" draggable=""true"" data-ref=""" + Ref + """ ondragstart=""drag(event)"">"
                 + "  <div class=""card-top"">"
                 + "    <span class=""task-id"">#" + Id + "</span>"
                 + "    " + ПриорHTML
                 + "  </div>"
-                + "  <a href=""#openIn1C?ref=" + Ref + """ class=""task-title-link"" title=""Нажмите, чтобы открыть задачу в 1С""><div class=""task-title"">" + Title + "</div></a>"
+                + "  <div class=""task-title"" onclick=""openCardModal('" + Ref + "', '" + Title + "', '" + Description + "', '" + Subject + "', '" + Assignee + "', '" + DueDate + "', '" + Колонка.id + "')"">" + Title + "</div>"
                 +    ПредметHTML
                 + "  <div class=""card-footer"">"
                 + "    <div class=""task-assignee"" title=""Исполнитель"">" + IconUser + Assignee + "</div>"
@@ -272,164 +335,252 @@
         КонецЦикла;
         
         СтолбцыHTML = СтолбцыHTML
-            + "<div class=""column"">"
+            + "<div class=""column"" ondragover=""allowDrop(event)"" ondragleave=""dragLeave(event)"" ondrop=""drop(event, '" + Колонка.id + "')"">"
             + "  <div class=""column-header"" style=""border-top: 3px solid " + Колонка.color + """>"
             + "    <span class=""column-title"">" + Колонка.name + "</span>"
             + "    <span class=""column-badge " + Колонка.badge + """>" + Счётчик + "</span>"
             + "  </div>"
-            + "  <div class=""column-body"">"
+            + "  <div class=""column-body"" id=""col-" + Колонка.id + """>"
             +      ЗадачиКолонки
             + "  </div>"
             + "</div>";
     КонецЦикла;
     
+    // Формирование опций селектов из реальных данных 1С
+    ОпцииКонтрагентов = "<option value="""">-- Не выбран (без привязки) --</option>";
+    Для Каждого К Из СписокКонтрагентов Цикл
+        ОпцииКонтрагентов = ОпцииКонтрагентов + "<option value=""" + К.Ref + """>" + ЭкранироватьHTML(К.Name) + ?(ПустаяСтрока(К.INN), "", " (ИНН: " + К.INN + ")") + "</option>";
+    КонецЦикла;
+    
+    ОпцииИсполнителей = "<option value="""">-- Текущий пользователь --</option>";
+    Для Каждого Исп Из СписокИсполнителей Цикл
+        ОпцииИсполнителей = ОпцииИсполнителей + "<option value=""" + Исп.Ref + """>" + ЭкранироватьHTML(Исп.Name) + "</option>";
+    КонецЦикла;
+    
+    ОпцииЗаказов = "<option value="""">-- Без привязки к заказу --</option>";
+    Для Каждого Зак Из СписокЗаказов Цикл
+        ОпцииЗаказов = ОпцииЗаказов + "<option value=""" + Зак.Ref + """>" + ЭкранироватьHTML(Зак.Name) + "</option>";
+    КонецЦикла;
+    
+    // Сборка полного документа с Drag&Drop и модальными окнами
     HTML = "<!DOCTYPE html>"
         + "<html><head><meta charset=""utf-8"">"
         + "<style>"
-        + "  :root {"
-        + "    --bg-main: #18181b;"
-        + "    --bg-header: #27272a;"
-        + "    --bg-col: #202024;"
-        + "    --bg-col-header: #27272a;"
-        + "    --bg-card: #27272a;"
-        + "    --bg-card-hover: #303036;"
-        + "    --border-main: #3f3f46;"
-        + "    --border-subtle: #2d2d33;"
-        + "    --text-main: #f4f4f5;"
-        + "    --text-muted: #a1a1aa;"
-        + "    --text-id: #71717a;"
-        + "    --input-bg: #18181b;"
-        + "    --input-border: #3f3f46;"
-        + "    --input-text: #f4f4f5;"
-        + "    --subject-bg: #1e293b;"
-        + "    --subject-border: #3b82f6;"
-        + "    --subject-text: #93c5fd;"
-        + "    --act-btn-bg: #1f1f23;"
-        + "    --act-btn-border: #3f3f46;"
-        + "    --act-btn-text: #d4d4d8;"
-        + "    --act-btn-hover: #3f3f46;"
-        + "    --sec-btn-bg: #27272a;"
-        + "    --sec-btn-border: #3f3f46;"
-        + "    --sec-btn-text: #e4e4e7;"
-        + "    --sec-btn-hover: #3f3f46;"
-        + "  }"
-        + "  body.theme-light {"
-        + "    --bg-main: #f8fafc;"
-        + "    --bg-header: #ffffff;"
-        + "    --bg-col: #ffffff;"
-        + "    --bg-col-header: #fafafa;"
-        + "    --bg-card: #ffffff;"
-        + "    --bg-card-hover: #ffffff;"
-        + "    --border-main: #e2e8f0;"
-        + "    --border-subtle: #f1f5f9;"
-        + "    --text-main: #1e293b;"
-        + "    --text-muted: #64748b;"
-        + "    --text-id: #64748b;"
-        + "    --input-bg: #ffffff;"
-        + "    --input-border: #cbd5e1;"
-        + "    --input-text: #1e293b;"
-        + "    --subject-bg: #eff6ff;"
-        + "    --subject-border: #bfdbfe;"
-        + "    --subject-text: #2563eb;"
-        + "    --act-btn-bg: #f1f5f9;"
-        + "    --act-btn-border: #e2e8f0;"
-        + "    --act-btn-text: #475569;"
-        + "    --act-btn-hover: #e2e8f0;"
-        + "    --sec-btn-bg: #f1f5f9;"
-        + "    --sec-btn-border: #cbd5e1;"
-        + "    --sec-btn-text: #475569;"
-        + "    --sec-btn-hover: #e2e8f0;"
-        + "  }"
         + "  * { box-sizing: border-box; margin: 0; padding: 0; }"
-        + "  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: var(--bg-main); color: var(--text-main); padding: 12px; user-select: none; transition: background 0.2s, color 0.2s; }"
-        + "  .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: var(--bg-header); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-main); box-shadow: 0 1px 3px rgba(0,0,0,0.15); }"
-        + "  .header-title { font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; }"
+        + "  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f8fafc; color: #1e293b; padding: 14px; user-select: none; }"
+        + "  .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; background: #ffffff; padding: 10px 16px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }"
+        + "  .header-title { font-size: 15px; font-weight: 700; color: #0f172a; display: flex; align-items: center; }"
         + "  .controls { display: flex; gap: 8px; align-items: center; }"
-        + "  .search-input { padding: 6px 12px; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--input-text); border-radius: 6px; font-size: 13px; width: 220px; outline: none; transition: border 0.2s; }"
-        + "  .search-input:focus { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }"
-        + "  .btn { padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; text-decoration: none; }"
+        + "  .search-input { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; width: 220px; outline: none; transition: border 0.2s; }"
+        + "  .search-input:focus { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.15); }"
+        + "  .btn { padding: 6px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; text-decoration: none; }"
         + "  .btn-primary { background: #f59e0b; color: #ffffff; }"
         + "  .btn-primary:hover { background: #d97706; }"
-        + "  .btn-secondary { background: var(--sec-btn-bg); color: var(--sec-btn-text); border: 1px solid var(--sec-btn-border); }"
-        + "  .btn-secondary:hover { background: var(--sec-btn-hover); color: var(--text-main); }"
-        + "  .board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; min-height: 84vh; }"
-        + "  .column { flex: 1; min-width: 240px; background: var(--bg-col); border: 1px solid var(--border-main); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }"
-        + "  .column-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-col-header); border-bottom: 1px solid var(--border-subtle); border-radius: 8px 8px 0 0; }"
-        + "  .column-title { font-size: 13px; font-weight: 700; color: var(--text-main); }"
+        + "  .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }"
+        + "  .btn-secondary:hover { background: #e2e8f0; color: #1e293b; }"
+        + "  .btn-success { background: #10b981; color: #ffffff; }"
+        + "  .btn-success:hover { background: #059669; }"
+        + "  .btn-danger { background: #ef4444; color: #ffffff; }"
+        + "  .btn-danger:hover { background: #dc2626; }"
+        + "  .board { display: flex; gap: 14px; align-items: flex-start; overflow-x: auto; min-height: 80vh; }"
+        + "  .column { flex: 1; min-width: 240px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: background 0.15s, border-color 0.15s; }"
+        + "  .column.drag-over { background: #fef3c7; border: 2px dashed #f59e0b; }"
+        + "  .column-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fafafa; border-bottom: 1px solid #f1f5f9; border-radius: 8px 8px 0 0; }"
+        + "  .column-title { font-size: 13px; font-weight: 700; color: #334155; }"
         + "  .column-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; }"
-        + "  .bg-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }"
-        + "  .bg-amber { background: rgba(245,158,11,0.2); color: #fbbf24; }"
-        + "  .bg-purple { background: rgba(168,85,247,0.2); color: #c084fc; }"
-        + "  .bg-emerald { background: rgba(16,185,129,0.2); color: #34d399; }"
+        + "  .bg-blue { background: #dbeafe; color: #1d4ed8; }"
+        + "  .bg-amber { background: #fef3c7; color: #b45309; }"
+        + "  .bg-purple { background: #ede9fe; color: #6d28d9; }"
+        + "  .bg-emerald { background: #d1fae5; color: #047857; }"
         + "  .column-body { padding: 10px; min-height: 350px; display: flex; flex-direction: column; gap: 8px; }"
-        + "  .task-card { background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 6px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }"
-        + "  .task-card:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-color: #52525b; background: var(--bg-card-hover); }"
+        + "  .task-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); cursor: grab; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }"
+        + "  .task-card:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.07); border-color: #cbd5e1; }"
+        + "  .task-card.dragging { opacity: 0.4; transform: scale(0.96); }"
         + "  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }"
-        + "  .task-id { font-size: 11px; font-weight: 700; color: var(--text-id); font-family: monospace; }"
+        + "  .task-id { font-size: 11px; font-weight: 700; color: #64748b; font-family: monospace; }"
         + "  .priority-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }"
-        + "  .priority-high { background: rgba(239,68,68,0.2); color: #f87171; }"
-        + "  .priority-med { background: rgba(245,158,11,0.2); color: #fbbf24; }"
-        + "  .priority-low { background: rgba(100,116,139,0.2); color: #94a3b8; }"
-        + "  .task-title-link { text-decoration: none; color: inherit; display: block; }"
-        + "  .task-title { font-size: 13px; font-weight: 600; color: var(--text-main); line-height: 1.35; margin-bottom: 6px; }"
-        + "  .task-title:hover { color: #60a5fa; }"
-        + "  .task-subject { font-size: 11px; font-weight: 600; color: var(--subject-text); background: var(--subject-bg); border: 1px solid var(--subject-border); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; margin-bottom: 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }"
-        + "  .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-subtle); padding-top: 6px; margin-top: 4px; font-size: 11px; color: var(--text-muted); }"
-        + "  .task-assignee { font-weight: 500; color: var(--text-muted); display: inline-flex; align-items: center; }"
-        + "  .task-date { font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; }"
-        + "  .task-date.overdue { color: #f87171; font-weight: 700; }"
-        + "  .card-actions { display: flex; gap: 4px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; }"
-        + "  .act-btn { font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 4px; text-decoration: none; background: var(--act-btn-bg); color: var(--act-btn-text); border: 1px solid var(--act-btn-border); transition: all 0.15s; display: inline-flex; align-items: center; }"
-        + "  .act-btn:hover { background: var(--act-btn-hover); color: var(--text-main); }"
-        + "  .act-primary { background: rgba(37,99,235,0.2); color: #60a5fa; border-color: rgba(96,165,250,0.4); }"
-        + "  .act-primary:hover { background: #2563eb; color: #ffffff; }"
-        + "  .act-purple { background: rgba(124,58,237,0.2); color: #c084fc; border-color: rgba(192,132,252,0.4); }"
-        + "  .act-purple:hover { background: #7c3aed; color: #ffffff; }"
-        + "  .act-success { background: rgba(5,150,105,0.2); color: #34d399; border-color: rgba(52,211,153,0.4); }"
-        + "  .act-success:hover { background: #059669; color: #ffffff; }"
-        + "  .act-danger { background: rgba(220,38,38,0.2); color: #f87171; border-color: rgba(248,113,113,0.4); margin-left: auto; }"
-        + "  .act-danger:hover { background: #dc2626; color: #ffffff; }"
+        + "  .priority-high { background: #fee2e2; color: #b91c1c; }"
+        + "  .priority-med { background: #fef3c7; color: #b45309; }"
+        + "  .priority-low { background: #f1f5f9; color: #475569; }"
+        + "  .task-title { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.35; margin-bottom: 6px; cursor: pointer; }"
+        + "  .task-title:hover { color: #2563eb; text-decoration: underline; }"
+        + "  .task-subject { font-size: 11px; font-weight: 600; color: #2563eb; background: #eff6ff; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; margin-bottom: 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }"
+        + "  .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #f1f5f9; padding-top: 6px; margin-top: 4px; font-size: 11px; color: #64748b; }"
+        + "  .task-assignee { font-weight: 500; color: #475569; display: inline-flex; align-items: center; }"
+        + "  .task-date { font-size: 11px; color: #64748b; display: inline-flex; align-items: center; }"
+        + "  .task-date.overdue { color: #dc2626; font-weight: 700; }"
+        + "  .card-actions { display: flex; gap: 4px; margin-top: 6px; padding-top: 4px; border-top: 1px solid #f8fafc; }"
+        + "  .act-btn { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-decoration: none; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; transition: all 0.15s; }"
+        + "  .act-btn:hover { background: #e2e8f0; color: #0f172a; }"
+        + "  .act-primary { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }"
+        + "  .act-primary:hover { background: #dbeafe; color: #1d4ed8; }"
+        + "  .act-success { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }"
+        + "  .act-success:hover { background: #d1fae5; color: #047857; }"
+        + "  .act-danger { background: #fef2f2; color: #dc2626; border-color: #fecaca; }"
+        + "  .act-danger:hover { background: #fee2e2; color: #b91c1c; }"
+        + "  /* Модальное окно */"
+        + "  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.45); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(2px); }"
+        + "  .modal-overlay.active { display: flex; }"
+        + "  .modal-box { background: #ffffff; width: 480px; max-width: 95vw; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; overflow: hidden; animation: modalPop 0.18s ease-out; }"
+        + "  @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }"
+        + "  .modal-header { padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }"
+        + "  .modal-header h3 { font-size: 15px; font-weight: 700; color: #0f172a; }"
+        + "  .modal-close { cursor: pointer; font-size: 18px; color: #94a3b8; line-height: 1; }"
+        + "  .modal-close:hover { color: #0f172a; }"
+        + "  .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; }"
+        + "  .form-group { display: flex; flex-direction: column; gap: 4px; }"
+        + "  .form-label { font-size: 12px; font-weight: 600; color: #475569; }"
+        + "  .form-input, .form-select, .form-textarea { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none; width: 100%; box-sizing: border-box; background: #ffffff; }"
+        + "  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.15); }"
+        + "  .modal-footer { padding: 12px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; gap: 8px; }"
         + "</style></head><body>"
         + "<div class=""header-bar"">"
-        + "  <div class=""header-title"">" + IconBoard + " Канбан-доска <span style=""font-size:12px; font-weight:500; color:var(--text-muted); margin-left:8px;"">• Всего: " + ВсегоЗадач + "</span></div>"
+        + "  <div class=""header-title"">" + IconBoard + " Канбан-доска (1С:Предприятие) <span style=""font-size:12px; font-weight:500; color:#64748b; margin-left:8px;"">• Всего: " + ВсегоЗадач + "</span></div>"
         + "  <div class=""controls"">"
         + "    <input type='text' class=""search-input"" placeholder=""Поиск задач..."" oninput=""filterTasks(this.value)"">"
-        + "    <a href=""#openNewIn1C"" class=""btn btn-primary"">" + IconPlus + " Задача (1С)</a>"
-        + "    <a href=""#refresh"" class=""btn btn-secondary"">" + IconRefresh + " Обновить</a>"
-        + "    <button onclick=""toggleTheme()"" class=""btn btn-secondary"" id=""themeToggleBtn"" title=""Переключить тему"">" + IconTheme + " <span id=""themeText"">Тема</span></button>"
+        + "    <button class=""btn btn-primary"" onclick=""openNewTaskModal()"">" + IconPlus + " Новая задача</button>"
+        + "    <a href=""v8action://refresh"" class=""btn btn-secondary"">" + IconRefresh + " Обновить</a>"
         + "  </div>"
         + "</div>"
         + "<div class=""board"">"
         +    СтолбцыHTML
         + "</div>"
+        + "<!-- Модальное окно просмотра / действий по карточке -->"
+        + "<div id=""cardModal"" class=""modal-overlay"" onclick=""closeModalBg(event, 'cardModal')"">"
+        + "  <div class=""modal-box"">"
+        + "    <div class=""modal-header"">"
+        + "      <h3 id=""modalCardTitle"">Задача</h3>"
+        + "      <span class=""modal-close"" onclick=""closeModal('cardModal')"">&times;</span>"
+        + "    </div>"
+        + "    <div class=""modal-body"">"
+        + "      <div class=""form-group""><div class=""form-label"">Описание:</div><div id=""modalCardDesc"" style=""font-size:13px; color:#334155; line-height:1.4; background:#f8fafc; padding:8px; border-radius:6px;"">-</div></div>"
+        + "      <div class=""form-group""><div class=""form-label"">Предмет / Контрагент:</div><div id=""modalCardSubject"" style=""font-size:13px; font-weight:600; color:#2563eb;"">-</div></div>"
+        + "      <div class=""form-group""><div class=""form-label"">Исполнитель:</div><div id=""modalCardAssignee"" style=""font-size:13px; color:#475569;"">-</div></div>"
+        + "      <div class=""form-group""><div class=""form-label"">Срок исполнения:</div><div id=""modalCardDueDate"" style=""font-size:13px; color:#475569;"">-</div></div>"
+        + "    </div>"
+        + "    <div class=""modal-footer"">"
+        + "      <div style=""display:flex; gap:6px;"">"
+        + "        <a id=""modalBtnOpen1C"" href=""#"" class=""btn btn-primary"">📄 Открыть в 1С</a>"
+        + "        <a id=""modalBtnDelete"" href=""#"" class=""btn btn-danger"" onclick=""return confirm('Удалить эту задачу в 1С?')"">🗑️ Удалить</a>"
+        + "      </div>"
+        + "      <button class=""btn btn-secondary"" onclick=""closeModal('cardModal')"">Закрыть</button>"
+        + "    </div>"
+        + "  </div>"
+        + "</div>"
+        + "<!-- Модальное окно создания новой задачи -->"
+        + "<div id=""newTaskModal"" class=""modal-overlay"" onclick=""closeModalBg(event, 'newTaskModal')"">"
+        + "  <div class=""modal-box"">"
+        + "    <div class=""modal-header"">"
+        + "      <h3>+ Новая задача в 1С:Предприятие</h3>"
+        + "      <span class=""modal-close"" onclick=""closeModal('newTaskModal')"">&times;</span>"
+        + "    </div>"
+        + "    <div class=""modal-body"">"
+        + "      <div class=""form-group"">"
+        + "        <div class=""form-label"">Наименование / Тема задачи *</div>"
+        + "        <input type=""text"" id=""newTitle"" class=""form-input"" placeholder=""Например: Подготовить договор поставки"">"
+        + "      </div>"
+        + "      <div class=""form-group"">"
+        + "        <div class=""form-label"">Подробное описание</div>"
+        + "        <textarea id=""newDesc"" class=""form-textarea"" rows=""3"" placeholder=""Укажите подробные детали и инструкции...""></textarea>"
+        + "      </div>"
+        + "      <div class=""form-group"">"
+        + "        <div class=""form-label"">Контрагент (из справочника 1С)</div>"
+        + "        <select id=""newPartnerRef"" class=""form-select"">"
+        +            ОпцииКонтрагентов
+        + "        </select>"
+        + "      </div>"
+        + "      <div class=""form-group"">"
+        + "        <div class=""form-label"">Связанный заказ покупателя (из базы 1С)</div>"
+        + "        <select id=""newOrderRef"" class=""form-select"">"
+        +            ОпцииЗаказов
+        + "        </select>"
+        + "      </div>"
+        + "      <div class=""form-group"">"
+        + "        <div class=""form-label"">Ответственный / Исполнитель (из базы 1С)</div>"
+        + "        <select id=""newAssigneeRef"" class=""form-select"">"
+        +            ОпцииИсполнителей
+        + "        </select>"
+        + "      </div>"
+        + "      <div style=""display:flex; gap:10px;"">"
+        + "        <div class=""form-group"" style=""flex:1;"">"
+        + "          <div class=""form-label"">Важность</div>"
+        + "          <select id=""newPriority"" class=""form-select"">"
+        + "            <option value=""medium"">Средняя (Обычная)</option>"
+        + "            <option value=""high"">Высокая (Срочно)</option>"
+        + "            <option value=""low"">Низкая</option>"
+        + "          </select>"
+        + "        </div>"
+        + "        <div class=""form-group"" style=""flex:1;"">"
+        + "          <div class=""form-label"">Срок (дней)</div>"
+        + "          <input type=""number"" id=""newDays"" class=""form-input"" value=""2"" min=""1"" max=""365"">"
+        + "        </div>"
+        + "      </div>"
+        + "    </div>"
+        + "    <div class=""modal-footer"">"
+        + "      <button class=""btn btn-primary"" onclick=""submitNewTask()"">💾 Создать задачу в 1С</button>"
+        + "      <button class=""btn btn-secondary"" onclick=""closeModal('newTaskModal')"">Отмена</button>"
+        + "    </div>"
+        + "  </div>"
+        + "</div>"
         + "<script>"
-        + "  function applySavedTheme() {"
-        + "    try {"
-        + "      var t = localStorage.getItem('v8_app_theme') || 'dark';"
-        + "      if (t === 'light') {"
-        + "        document.body.classList.add('theme-light');"
-        + "        var txt = document.getElementById('themeText'); if(txt) txt.textContent = '🌙 Темная';"
-        + "      } else {"
-        + "        document.body.classList.remove('theme-light');"
-        + "        var txt = document.getElementById('themeText'); if(txt) txt.textContent = '☀️ Светлая';"
-        + "      }"
-        + "    } catch(e){}"
+        + "  var selectedRef = '';"
+        + "  function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }"
+        + "  function dragLeave(ev) { ev.currentTarget.classList.remove('drag-over'); }"
+        + "  function drag(ev) {"
+        + "    ev.dataTransfer.setData('text/plain', ev.target.getAttribute('data-ref'));"
+        + "    ev.target.classList.add('dragging');"
         + "  }"
-        + "  function toggleTheme() {"
-        + "    try {"
-        + "      var isLight = document.body.classList.toggle('theme-light');"
-        + "      var newT = isLight ? 'light' : 'dark';"
-        + "      localStorage.setItem('v8_app_theme', newT);"
-        + "      var txt = document.getElementById('themeText'); if(txt) txt.textContent = isLight ? '🌙 Темная' : '☀️ Светлая';"
-        + "    } catch(e){}"
+        + "  function drop(ev, colId) {"
+        + "    ev.preventDefault();"
+        + "    ev.currentTarget.classList.remove('drag-over');"
+        + "    var ref = ev.dataTransfer.getData('text/plain');"
+        + "    if (ref) {"
+        + "      window.location.href = 'v8action://moveTask?ref=' + encodeURIComponent(ref) + '&to=' + encodeURIComponent(colId);"
+        + "    }"
         + "  }"
-        + "  applySavedTheme();"
         + "  function filterTasks(q) {"
         + "    var query = q.toLowerCase();"
         + "    var cards = document.querySelectorAll('.task-card');"
         + "    cards.forEach(function(card) {"
         + "      card.style.display = (card.textContent.toLowerCase().indexOf(query) >= 0) ? '' : 'none';"
         + "    });"
+        + "  }"
+        + "  function openCardModal(ref, title, desc, subject, assignee, dueDate, col) {"
+        + "    selectedRef = ref;"
+        + "    document.getElementById('modalCardTitle').textContent = title;"
+        + "    document.getElementById('modalCardDesc').textContent = desc || 'Нет описания';"
+        + "    document.getElementById('modalCardSubject').textContent = subject || 'Не указан';"
+        + "    document.getElementById('modalCardAssignee').textContent = assignee || 'Администратор';"
+        + "    document.getElementById('modalCardDueDate').textContent = dueDate || 'Не задан';"
+        + "    document.getElementById('modalBtnOpen1C').href = 'v8action://openIn1C?ref=' + encodeURIComponent(ref);"
+        + "    document.getElementById('modalBtnDelete').href = 'v8action://deleteTask?ref=' + encodeURIComponent(ref);"
+        + "    document.getElementById('cardModal').classList.add('active');"
+        + "  }"
+        + "  function openNewTaskModal() {"
+        + "    document.getElementById('newTitle').value = '';"
+        + "    document.getElementById('newDesc').value = '';"
+        + "    document.getElementById('newPartnerRef').value = '';"
+        + "    document.getElementById('newOrderRef').value = '';"
+        + "    document.getElementById('newAssigneeRef').value = '';"
+        + "    document.getElementById('newTaskModal').classList.add('active');"
+        + "  }"
+        + "  function closeModal(id) {"
+        + "    document.getElementById(id).classList.remove('active');"
+        + "  }"
+        + "  function closeModalBg(ev, id) {"
+        + "    if (ev.target.id === id) closeModal(id);"
+        + "  }"
+        + "  function submitNewTask() {"
+        + "    var title = document.getElementById('newTitle').value.trim();"
+        + "    if (!title) { alert('Укажите наименование задачи'); return; }"
+        + "    var desc = document.getElementById('newDesc').value.trim();"
+        + "    var partnerRef = document.getElementById('newPartnerRef').value;"
+        + "    var orderRef = document.getElementById('newOrderRef').value;"
+        + "    var assigneeRef = document.getElementById('newAssigneeRef').value;"
+        + "    var priority = document.getElementById('newPriority').value;"
+        + "    var days = document.getElementById('newDays').value || '2';"
+        + "    closeModal('newTaskModal');"
+        + "    window.location.href = 'v8action://createTask?title=' + encodeURIComponent(title) + '&desc=' + encodeURIComponent(desc) + '&partnerRef=' + encodeURIComponent(partnerRef) + '&orderRef=' + encodeURIComponent(orderRef) + '&assigneeRef=' + encodeURIComponent(assigneeRef) + '&priority=' + encodeURIComponent(priority) + '&days=' + encodeURIComponent(days);"
         + "  }"
         + "</script>"
         + "</body></html>";
@@ -438,38 +589,23 @@
 КонецФункции
 
 // =============================================================================
-// ОБРАБОТЧИК ДЕЙСТВИЙ И КЛИКОВ ПО ССЫЛКАМ В 1С
+// ОБРАБОТЧИК НАВИГАЦИИ И СОБЫТИЙ HTML (Drag&Drop, Создание, Открытие, Удаление)
 // =============================================================================
 
 &НаКлиенте
-Процедура КанбанHTMLПриНажатииНаСсылку(Элемент, ДанныеСобытия, СтандартнаяОбработка)
+Процедура КанбанHTMLПриНажатииНаСсылку(Элемент, Адрес, СтандартнаяОбработка)
     СтандартнаяОбработка = Ложь;
     
-    СтрокаВызова = "";
-    Если ТипЗнч(ДанныеСобытия) = Тип("Строка") Тогда
-        СтрокаВызова = ДанныеСобытия;
-    Иначе
-        Попытка
-            СтрокаВызова = ДанныеСобытия.Href;
-        Исключение
-            Попытка
-                СтрокаВызова = ДанныеСобытия.href;
-            Исключение
-                СтрокаВызова = Строка(ДанныеСобытия);
-            КонецПопытки;
-        КонецПопытки;
-    КонецЕсли;
-    
-    ИндРешетки = СтрНайти(СтрокаВызова, "#");
-    Если ИндРешетки > 0 Тогда
-        СтрокаВызова = Сред(СтрокаВызова, ИндРешетки + 1);
-    ИначеЕсли СтрНайти(СтрокаВызова, "/kanban/") > 0 Тогда
-        ИндКанбан = СтрНайти(СтрокаВызова, "/kanban/");
-        СтрокаВызова = Сред(СтрокаВызова, ИндКанбан + 8);
-    КонецЕсли;
-    
-    Если СтрНачинаетсяС(СтрокаВызова, "/") Тогда
-        СтрокаВызова = Сред(СтрокаВызова, 2);
+    // Извлекаем команду из адреса
+    СтрокаВызова = Адрес;
+    Если СтрНачинаетсяС(Адрес, "v8action://") Тогда
+        СтрокаВызова = Сред(Адрес, 12);
+    ИначеЕсли СтрНачинаетсяС(Адрес, "kanban://") Тогда
+        СтрокаВызова = Сред(Адрес, 10);
+    ИначеЕсли СтрНачинаетсяС(Адрес, "http://kanban/") Тогда
+        СтрокаВызова = Сред(Адрес, 15);
+    ИначеЕсли СтрНачинаетсяС(Адрес, "https://kanban/") Тогда
+        СтрокаВызова = Сред(Адрес, 16);
     КонецЕсли;
     
     ИндВопроса = СтрНайти(СтрокаВызова, "?");
@@ -478,22 +614,26 @@
     
     мПараметры = РазобратьПараметрыURL(СтрокаПараметров);
     
-    Если ИмяКоманды = "openNewIn1C" Тогда
-        ОткрытьФормуЗадачи();
+    Если ИмяКоманды = "moveTask" Тогда
+        Ref = мПараметры.Получить("ref");
+        ToState = мПараметры.Получить("to");
+        ИзменитьСтатусЗадачи1СНаСервере(Ref, ToState);
+        ОбновитьДоску();
         
     ИначеЕсли ИмяКоманды = "openIn1C" Тогда
         Ref = мПараметры.Получить("ref");
-        ОткрытьФормуЗадачи(Ref);
+        ОткрытьЗадачуВ1С(Ref);
         
-    ИначеЕсли ИмяКоманды = "moveTask" Тогда
-        Ref = мПараметры.Получить("ref");
-        ToState = мПараметры.Получить("to");
+    ИначеЕсли ИмяКоманды = "createTask" Тогда
+        Title = мПараметры.Получить("title");
+        Desc = мПараметры.Получить("desc");
+        PartnerRef = мПараметры.Получить("partnerRef");
+        OrderRef = мПараметры.Получить("orderRef");
+        AssigneeRef = мПараметры.Получить("assigneeRef");
+        Priority = мПараметры.Получить("priority");
+        Days = Число(мПараметры.Получить("days"));
         
-        ТекстОшибки = "";
-        ИзменитьСтатусЗадачи1СНаСервере(Ref, ToState, ТекстОшибки);
-        Если ЗначениеЗаполнено(ТекстОшибки) Тогда
-            ПоказатьПредупреждение(, "Ошибка перемещения задачи: " + ТекстОшибки);
-        КонецЕсли;
+        СоздатьЗадачу1СРасширеннуюНаСервере(Title, Desc, PartnerRef, OrderRef, AssigneeRef, Priority, Days);
         ОбновитьДоску();
         
     ИначеЕсли ИмяКоманды = "deleteTask" Тогда
@@ -506,54 +646,115 @@
     КонецЕсли;
 КонецПроцедуры
 
+&НаКлиенте
+Процедура ОткрытьЗадачуВ1С(RefСтрока)
+    Ссылка = ПолучитьСсылкуЗадачиПоRefНаСервере(RefСтрока);
+    Если ЗначениеЗаполнено(Ссылка) Тогда
+        ПоказатьЗначение(, Ссылка);
+    КонецЕсли;
+КонецПроцедуры
+
 &НаСервере
-Процедура ИзменитьСтатусЗадачи1СНаСервере(RefСтрока, ЦелеваяКолонка, ТекстОшибки = "")
+Функция ПолучитьСсылкуЗадачиПоRefНаСервере(RefСтрока)
+    Попытка
+        УИД = Новый УникальныйИдентификатор(RefСтрока);
+        Возврат Задачи.ЗадачаИсполнителя.ПолучитьСсылку(УИД);
+    Исключение
+        Возврат Неопределено;
+    КонецПопытки;
+КонецФункции
+
+&НаСервере
+Процедура ИзменитьСтатусЗадачи1СНаСервере(RefСтрока, ЦелеваяКолонка)
     Попытка
         УИД = Новый УникальныйИдентификатор(RefСтрока);
         Ссылка = Задачи.ЗадачаИсполнителя.ПолучитьСсылку(УИД);
-        Если Не ЗначениеЗаполнено(Ссылка) Тогда
-            ТекстОшибки = "Задача не найдена: " + RefСтрока;
-            Возврат;
-        КонецЕсли;
-        
-        мОбъектЗадачи = Ссылка.ПолучитьОбъект();
-        Если мОбъектЗадачи = Неопределено Тогда
-            ТекстОшибки = "Не удалось открыть объект задачи для записи.";
-            Возврат;
-        КонецЕсли;
-        
-        Если Не ЗначениеЗаполнено(мОбъектЗадачи.Исполнитель) Тогда
-            Попытка
-                мОбъектЗадачи.Исполнитель = Пользователи.АвторизованныйПользователь();
-            Исключение
-                мОбъектЗадачи.Исполнитель = Справочники.Пользователи.НайтиПоНаименованию("Администратор");
-            КонецПопытки;
-        КонецЕсли;
-        
-        Если ЦелеваяКолонка = "todo" Тогда
-            мОбъектЗадачи.ПринятаКИсполнению = Ложь;
-            мОбъектЗадачи.Выполнена = Ложь;
-        ИначеЕсли ЦелеваяКолонка = "in_progress" Тогда
-            мОбъектЗадачи.ПринятаКИсполнению = Истина;
-            мОбъектЗадачи.Выполнена = Ложь;
-            Если Не ЗначениеЗаполнено(мОбъектЗадачи.ДатаПринятияКИсполнению) Тогда
-                мОбъектЗадачи.ДатаПринятияКИсполнению = ТекущаяДатаСеанса();
+        Если ЗначениеЗаполнено(Ссылка) Тогда
+            Объект = Ссылка.ПолучитьОбъект();
+            Если Объект <> Неопределено Тогда
+                Если ЦелеваяКолонка = "todo" Тогда
+                    Объект.ПринятаКИсполнению = Ложь;
+                    Объект.Выполнена = Ложь;
+                ИначеЕсли ЦелеваяКолонка = "in_progress" Тогда
+                    Объект.ПринятаКИсполнению = Истина;
+                    Объект.Выполнена = Ложь;
+                    Если Не ЗначениеЗаполнено(Объект.ДатаПринятияКИсполнению) Тогда
+                        Объект.ДатаПринятияКИсполнению = ТекущаяДата();
+                    КонецЕсли;
+                ИначеЕсли ЦелеваяКолонка = "review" Тогда
+                    Объект.ПринятаКИсполнению = Истина;
+                    Объект.Выполнена = Ложь;
+                    Объект.Важность = Перечисления.ВариантыВажностиЗадачи.Высокая;
+                ИначеЕсли ЦелеваяКолонка = "done" Тогда
+                    Объект.Выполнена = Истина;
+                    Объект.ДатаИсполнения = ТекущаяДата();
+                КонецЕсли;
+                Объект.Записать();
             КонецЕсли;
-        ИначеЕсли ЦелеваяКолонка = "review" Тогда
-            мОбъектЗадачи.ПринятаКИсполнению = Истина;
-            мОбъектЗадачи.Выполнена = Ложь;
-            мОбъектЗадачи.Важность = Перечисления.ВариантыВажностиЗадачи.Высокая;
-        ИначеЕсли ЦелеваяКолонка = "done" Тогда
-            мОбъектЗадачи.Выполнена = Истина;
-            мОбъектЗадачи.ДатаИсполнения = ТекущаяДатаСеанса();
+        КонецЕсли;
+    Исключение КонецПопытки;
+КонецПроцедуры
+
+&НаСервере
+Функция СоздатьЗадачу1СРасширеннуюНаСервере(Заголовок, Описание, КонтрагентRef, ЗаказRef, ИсполнительRef, ВажностьСтрока, СрокДней)
+    Попытка
+        НоваяЗадача = Задачи.ЗадачаИсполнителя.СоздатьЗадачу();
+        НоваяЗадача.Дата = ТекущаяДата();
+        НоваяЗадача.Наименование = ?(ПустаяСтрока(Заголовок), "Новая задача", Заголовок);
+        НоваяЗадача.Описание = Описание;
+        
+        Попытка
+            НоваяЗадача.Автор = ПользователиИнформационнойБазы.ТекущийПользователь();
+        Исключение КонецПопытки;
+        
+        // Привязка исполнителя
+        Если Не ПустаяСтрока(ИсполнительRef) Тогда
+            Попытка
+                УИД = Новый УникальныйИдентификатор(ИсполнительRef);
+                ИсполнительСсылка = Справочники.Пользователи.ПолучитьСсылку(УИД);
+                Если ЗначениеЗаполнено(ИсполнительСсылка) Тогда
+                    НоваяЗадача.Исполнитель = ИсполнительСсылка;
+                КонецЕсли;
+            Исключение КонецПопытки;
         КонецЕсли;
         
-        мОбъектЗадачи.ОбменДанными.Загрузка = Истина;
-        мОбъектЗадачи.Записать();
+        // Привязка предмета (Заказ или Контрагент)
+        Если Не ПустаяСтрока(ЗаказRef) Тогда
+            Попытка
+                УИД = Новый УникальныйИдентификатор(ЗаказRef);
+                ЗаказСсылка = Документы.ЗаказПокупателя.ПолучитьСсылку(УИД);
+                Если ЗначениеЗаполнено(ЗаказСсылка) Тогда
+                    НоваяЗадача.Предмет = ЗаказСсылка;
+                КонецЕсли;
+            Исключение КонецПопытки;
+        ИначеЕсли Не ПустаяСтрока(КонтрагентRef) Тогда
+            Попытка
+                УИД = Новый УникальныйИдентификатор(КонтрагентRef);
+                КонтрагентСсылка = Справочники.Контрагенты.ПолучитьСсылку(УИД);
+                Если ЗначениеЗаполнено(КонтрагентСсылка) Тогда
+                    НоваяЗадача.Предмет = КонтрагентСсылка;
+                КонецЕсли;
+            Исключение КонецПопытки;
+        КонецЕсли;
+        
+        // Важность
+        Если ВажностьСтрока = "high" Тогда
+            НоваяЗадача.Важность = Перечисления.ВариантыВажностиЗадачи.Высокая;
+        ИначеЕсли ВажностьСтрока = "low" Тогда
+            НоваяЗадача.Важность = Перечисления.ВариантыВажностиЗадачи.Низкая;
+        Иначе
+            НоваяЗадача.Важность = Перечисления.ВариантыВажностиЗадачи.Обычная;
+        КонецЕсли;
+        
+        Срок = ?(СрокДней > 0, СрокДней, 2);
+        НоваяЗадача.СрокИсполнения = ТекущаяДата() + (Срок * 86400);
+        НоваяЗадача.Записать();
+        
+        Возврат НоваяЗадача.Ссылка;
     Исключение
-        ТекстОшибки = ОписаниеОшибки();
+        Возврат Неопределено;
     КонецПопытки;
-КонецПроцедуры
+КонецФункции
 
 &НаСервере
 Процедура УдалитьЗадачу1СНаСервере(RefСтрока)
@@ -561,14 +762,17 @@
         УИД = Новый УникальныйИдентификатор(RefСтрока);
         Ссылка = Задачи.ЗадачаИсполнителя.ПолучитьСсылку(УИД);
         Если ЗначениеЗаполнено(Ссылка) Тогда
-            мОбъектЗадачи = Ссылка.ПолучитьОбъект();
-            Если мОбъектЗадачи <> Неопределено Тогда
-                мОбъектЗадачи.ОбменДанными.Загрузка = Истина;
-                мОбъектЗадачи.УстановитьПометкуУдаления(Истина);
+            Объект = Ссылка.ПолучитьОбъект();
+            Если Объект <> Неопределено Тогда
+                Объект.УстановитьПометкуУдаления(Истина);
             КонецЕсли;
         КонецЕсли;
     Исключение КонецПопытки;
 КонецПроцедуры
+
+// =============================================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// =============================================================================
 
 &НаСервереБезКонтекста
 Функция ЭкранироватьHTML(Текст)
@@ -598,6 +802,7 @@
         Если ИндРавно > 0 Тогда
             Ключ = Лев(Пара, ИндРавно - 1);
             Значение = Сред(Пара, ИндРавно + 1);
+            // Базовое декодирование URI
             Значение = СтрЗаменить(Значение, "+", " ");
             Значение = СтрЗаменить(Значение, "%20", " ");
             Значение = СтрЗаменить(Значение, "%23", "#");

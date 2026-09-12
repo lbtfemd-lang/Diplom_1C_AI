@@ -1,0 +1,72 @@
+{
+  "dimensions": {
+    "width_inches": 13.333,
+    "height_inches": 7.5,
+    "aspect_ratio": "16:9",
+    "margin_left_inches": 0.8,
+    "margin_top_inches": 0.6,
+    "margin_right_inches": 0.8,
+    "margin_bottom_inches": 0.6
+  },
+  "colors": {
+    "background_canvas": { "hex": "#0F172A", "rgb": [15, 23, 42] },
+    "card_surface": { "hex": "#1E293B", "rgb": [30, 41, 59] },
+    "card_border": { "hex": "#334155", "rgb": [51, 65, 85] },
+    "card_hover": { "hex": "#273549", "rgb": [39, 53, 73] },
+    "brand_1c_gold": { "hex": "#FFB300", "rgb": [255, 179, 0] },
+    "brand_1c_amber": { "hex": "#F59E0B", "rgb": [245, 158, 11] },
+    "tech_cyan": { "hex": "#06B6D4", "rgb": [6, 182, 212] },
+    "tech_indigo": { "hex": "#6366F1", "rgb": [99, 102, 241] },
+    "success_emerald": { "hex": "#10B981", "rgb": [16, 185, 129] },
+    "danger_crimson": { "hex": "#EF4444", "rgb": [239, 68, 68] },
+    "text_primary_white": { "hex": "#FFFFFF", "rgb": [255, 255, 255] },
+    "text_secondary_slate": { "hex": "#94A3B8", "rgb": [148, 163, 184] },
+    "text_code_bg": { "hex": "#0B1120", "rgb": [11, 17, 32] },
+    "table_header_bg": { "hex": "#1E293B", "rgb": [30, 41, 59] },
+    "table_row_alt_bg": { "hex": "#162032", "rgb": [22, 32, 50] }
+  },
+  "typography": {
+    "title_font": "Inter",
+    "body_font": "Inter",
+    "mono_font": "JetBrains Mono",
+    "sizes_pt": {
+      "slide_title": 30,
+      "slide_subtitle": 18,
+      "card_heading": 18,
+      "card_body": 14,
+      "stat_hero": 48,
+      "stat_label": 13,
+      "code": 11,
+      "table_header": 13,
+      "table_cell": 12,
+      "badge": 11,
+      "footer": 10
+    }
+  },
+  "grids": {
+    "3_card_grid": {
+      "columns": 3,
+      "card_width_inches": 3.64,
+      "card_height_inches": 4.8,
+      "gap_inches": 0.4,
+      "top_inches": 1.7
+    },
+    "2x3_grid": {
+      "columns": 3,
+      "rows": 2,
+      "card_width_inches": 3.64,
+      "card_height_inches": 2.25,
+      "gap_x_inches": 0.4,
+      "gap_y_inches": 0.3,
+      "top_inches": 1.7
+    },
+    "split_50_50": {
+      "left_col_left": 0.8,
+      "left_col_width": 5.6,
+      "right_col_left": 6.8,
+      "right_col_width": 5.7,
+      "top_inches": 1.7,
+      "height_inches": 5.1
+    }
+  }
+}

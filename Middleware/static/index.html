@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1С:Управление нашей фирмой 3.0 | Интеллектуальный ассистент</title>
+  <meta name="description" content="Интеллектуальный ассистент руководителя в интерфейсе 1С:Предприятие 8.5">
+  <link rel="stylesheet" href="/static/styles.css?v=mobile3">
+</head>
+<body class="theme-light">
+  <div class="v8-root">
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="v8-sidebar-backdrop" id="sidebarBackdrop" onclick="toggleMobileSidebar()"></div>
+
+    <!-- 1C 8.5 Header -->
+    <header class="v8-topbar">
+      <div class="v8-topbar-left">
+        <!-- Mobile Drawer Hamburger Toggle -->
+        <button class="v8-mobile-menu-btn" onclick="toggleMobileSidebar()" title="Меню разделов">
+          <svg class="v8-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+
+        <div class="v8-badge-1c" title="1С:Предприятие 8.5">1С</div>
+        <div class="v8-title-text">
+          1С:Управление нашей фирмой 3.0
+          <span class="v8-title-sub">/ Интеллектуальный ассистент</span>
+        </div>
+      </div>
+
+      <div class="v8-search-container">
+        <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input type="text" class="v8-search-input" id="globalSearch" placeholder="Поиск по базе 1С и меню...">
+      </div>
+
+      <div class="v8-topbar-right">
+        <!-- Theme Toggle -->
+        <button class="v8-header-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Переключить цветовую тему">
+          <span id="themeIconSlot">
+            <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            </svg>
+          </span>
+          <span id="themeLabel">Тёмная тема</span>
+        </button>
+
+        <!-- Direct 1C Web Client Link -->
+        <a href="http://localhost:8081/unf" target="_blank" class="v8-header-btn" title="Открыть веб-клиент 1С:УНФ на порту 8081">
+          <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          </svg>
+          <span>Веб-клиент (:8081)</span>
+        </a>
+
+        <!-- Outbox Quick Button -->
+        <button class="v8-header-btn" onclick="openEmailOutboxModal()" title="Журнал корпоративной почты (Outbox)">
+          <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <span>Почта (Outbox)</span>
+        </button>
+
+        <!-- Current User with Role & Switch/Logout Menu -->
+        <div class="v8-user-pill-container" id="userPillContainer">
+          <div class="v8-user-pill" id="userPill" onclick="toggleUserDropdown()" title="Нажмите для смены пользователя / выхода">
+            <span class="v8-user-avatar" id="userAvatar">A</span>
+            <span id="userNameLabel">Абдулов Р.Ф.</span>
+            <span class="v8-role-badge" id="userRoleBadge">директор</span>
+            <svg class="v8-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+          <div class="v8-user-dropdown" id="userDropdown" style="display:none;">
+            <div class="v8-user-dropdown-header">
+              <strong id="dropdownFullName">Абдулов Ринат Фаридович</strong>
+              <div class="v8-dropdown-dept" id="dropdownDept">Дирекция (Генеральный директор)</div>
+            </div>
+            <div class="v8-user-dropdown-divider"></div>
+            <button class="v8-dropdown-item" type="button" onclick="openLoginModal(true)">
+              <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+              </svg>
+              Сменить пользователя...
+            </button>
+            <button class="v8-dropdown-item danger" type="button" onclick="logout()">
+              <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Завершить сеанс
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 1C 8.5 Open Tabs Strip (Even distribution on mobile, NEVER cut off) -->
+    <nav class="v8-tabs-strip" id="tabsStrip">
+      <div class="v8-tab active" id="tabChat" onclick="switchTab('chat')">
+        <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="v8-tab-text">Ассистент 1С</span>
+        <span class="v8-tab-text-short">Ассистент</span>
+      </div>
+
+      <div class="v8-tab" id="tabKanban" onclick="switchTab('kanban')">
+        <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18M15 3v18"/>
+        </svg>
+        <span class="v8-tab-text">Канбан задач</span>
+        <span class="v8-tab-text-short">Канбан</span>
+      </div>
+
+      <div class="v8-tab" id="tabAnalytics" data-role="director,cfo,admin" onclick="switchTab('analytics')">
+        <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+        </svg>
+        <span class="v8-tab-text">Финансовый монитор</span>
+        <span class="v8-tab-text-short">Монитор</span>
+      </div>
+
+      <div class="v8-tab" id="tabBusiness" onclick="switchTab('business')">
+        <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        <span class="v8-tab-text">Бизнес-инструменты РФ</span>
+        <span class="v8-tab-text-short">Бизнес</span>
+      </div>
+
+      <div class="v8-tab" id="tabSystem" onclick="switchTab('system')">
+        <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span class="v8-tab-text">Инфраструктура 1С</span>
+        <span class="v8-tab-text-short">Сервисы</span>
+      </div>
+    </nav>
+
+    <!-- Workspace Body Layout -->
+    <div class="v8-body-layout">
+      <!-- 1C:Taxi Sections Sidebar -->
+      <aside class="v8-taxi-nav" id="taxiSidebar">
+        <div class="v8-nav-item" onclick="open1CSection('Главное')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          </svg>
+          <span>Главное</span>
+        </div>
+
+        <div class="v8-nav-item" onclick="open1CSection('CRM')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>CRM</span>
+        </div>
+
+        <div class="v8-nav-item" onclick="open1CSection('Продажи')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+          </svg>
+          <span>Продажи</span>
+        </div>
+
+        <div class="v8-nav-item" onclick="open1CSection('Закупки')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
+          </svg>
+          <span>Закупки</span>
+        </div>
+
+        <div class="v8-nav-item" onclick="open1CSection('Склад')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3v18h18"/><path d="M7 16h4"/><path d="M7 11h8"/><path d="M7 6h12"/>
+          </svg>
+          <span>Склад</span>
+        </div>
+
+        <div class="v8-nav-item" onclick="open1CSection('Деньги')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>
+          </svg>
+          <span>Деньги</span>
+        </div>
+
+        <div class="v8-nav-item active" onclick="switchTab('chat')">
+          <svg class="v8-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <span>ИИ Ассистент</span>
+        </div>
+      </aside>
+
+      <!-- Main Canvas -->
+      <main class="v8-workspace">
+        <!-- VIEW 1: AI ASSISTANT -->
+        <section class="v8-view active" id="viewChat">
+          <div class="v8-chat-layout">
+            <!-- Left: Chat Stream & Scenarios -->
+            <div class="v8-chat-main">
+              <!-- Toolbar (Adaptive, Zero Cutoffs) -->
+              <div class="v8-toolbar">
+                <div class="v8-toolbar-group">
+                  <button class="v8-btn v8-btn-primary" onclick="openNewTaskModal()">
+                    <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/>
+                    </svg>
+                    <span class="v8-btn-full">Создать задачу</span>
+                    <span class="v8-btn-short">Задача</span>
+                  </button>
+                  <button class="v8-btn" onclick="open1CDocument('ЗаказПокупателя')">
+                    <span>Заказы</span>
+                  </button>
+                  <button class="v8-btn" onclick="open1CDocument('ПлатежноеПоручение')">
+                    <span>Платежи</span>
+                  </button>
+                  <button class="v8-btn" onclick="openEmailOutboxModal()" title="Журнал корпоративной почты (Outbox)">
+                    <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                      <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                    <span>Почта (Outbox)</span>
+                  </button>
+                  <button class="v8-btn v8-btn-icon-only" onclick="refreshCurrentView()" title="Обновить">
+                    <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="v8-toolbar-group">
+                  <span class="v8-badge success">
+                    <span>●</span> Учебный стенд
+                  </span>
+                </div>
+              </div>
+
+              <!-- Scenario Strip: Discrete 2-Item Pages (Zero Cutoffs) -->
+              <div class="v8-scenario-wrapper">
+                <button class="v8-arrow-btn left" onclick="scrollScenarioPage(-1)" title="Назад">
+                  <svg class="v8-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="15 18 9 12 15 6"/>
+                  </svg>
+                </button>
+
+                <div class="v8-scenario-viewport" id="scenarioStrip">
+                  <div class="v8-scenario-page">
+                    <button class="v8-pill-btn" onclick="sendQuickPrompt('Будет ли кассовый разрыв на этой неделе?')">
+                      Кассовый разрыв 7 дней
+                    </button>
+                    <button class="v8-pill-btn" onclick="sendQuickPrompt('Покажи зависшие и сорванные заказы')">
+                      Срыв отгрузок
+                    </button>
+                  </div>
+                  <div class="v8-scenario-page">
+                    <button class="v8-pill-btn" onclick="sendQuickPrompt('Какие неликвиды лежат на складе?')">
+                      Неликвиды на складе
+                    </button>
+                    <button class="v8-pill-btn" onclick="sendQuickPrompt('Кому и сколько мы должны денег?')">
+                      Кредиторка поставщикам
+                    </button>
+                  </div>
+                  <div class="v8-scenario-page">
+                    <button class="v8-pill-btn" onclick="sendQuickPrompt('Покажи спящих клиентов без заказов')">
+                      Возврат спящих клиентов
+                    </button>
+                    <button class="v8-pill-btn" onclick="sendQuickPrompt('У кого дешевле купить кабель?')">
+                      Цены закупки
+                    </button>
+                  </div>
+                </div>
+
+                <button class="v8-arrow-btn right" onclick="scrollScenarioPage(1)" title="Вперед">
+                  <svg class="v8-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Message Stream -->
+              <div class="v8-chat-scroll" id="chatViewport">
+                <!-- Messages appended dynamically -->
+              </div>
+
+              <!-- Input Area -->
+              <div class="v8-chat-composer">
+                <div class="v8-composer-box">
+                  <textarea 
+                    id="chatInput" 
+                    class="v8-textarea" 
+                    placeholder="Введите вопрос по базе 1С или поручение ассистенту..." 
+                    rows="1"
+                    onkeydown="handleInputKeydown(event)"
+                    oninput="autoResizeTextarea(this)"></textarea>
+
+                  <button class="v8-btn v8-btn-icon-only" id="voiceBtn" onclick="toggleVoiceInput()" title="Голосовой ввод">
+                    <svg class="v8-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                  </button>
+                  <button class="v8-btn v8-btn-primary" id="sendBtn" onclick="sendChatMessage()" title="Отправить">
+                    <span>Отправить</span>
+                    <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+                    </svg>
+                  </button>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);padding:2px 4px;">
+                  <span>Учебный стенд: примеры не подтверждают подключение к базе 1С</span>
+                  <span>Enter — отправить • Shift+Enter — новая строка</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Operational Control Context -->
+            <div class="v8-chat-context">
+              <!-- Alerts -->
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span>Демонстрационные сигналы</span>
+                  <span class="v8-badge danger">2 срыва</span>
+                </div>
+                <div class="v8-notice-item">
+                  <div class="v8-notice-title">
+                    <span class="v8-badge danger">Срыв отгрузки</span> Заказ №00000003
+                  </div>
+                  <div class="v8-notice-desc">
+                    ООО "АльфаТрейд" • <strong>128 500 ₽</strong><br>
+                    Просрочка 12 дней. Не отгружен силовой кабель.
+                  </div>
+                  <div class="v8-notice-actions">
+                    <button class="v8-btn" onclick="open1CObjectInBrowser('Документ.ЗаказПокупателя', '00000003')">
+                      Открыть в 1С
+                    </button>
+                    <button class="v8-btn v8-btn-primary" onclick="createKanbanTaskDirect('Срыв заказа №00000003 (АльфаТрейд)', 'Срочно выяснить причину задержки 128 500 ₽ у начальника склада.', 'high', this)">
+                      В работу
+                    </button>
+                  </div>
+                </div>
+
+                <div class="v8-notice-item">
+                  <div class="v8-notice-title">
+                    <span class="v8-badge warning">Оплата</span> ЗАО "Световые Системы"
+                  </div>
+                  <div class="v8-notice-desc">
+                    Договор поставки № 14 • <strong>890 370.28 ₽</strong><br>
+                    Наступил срок плановой оплаты.
+                  </div>
+                  <div class="v8-notice-actions">
+                    <button class="v8-btn" onclick="open1CObjectInBrowser('Документ.ЗаказПоставщику', '00000014')">
+                      Открыть в 1С
+                    </button>
+                    <button class="v8-btn v8-btn-primary" onclick="createKanbanTaskDirect('Оплата: ЗАО Световые Системы', 'Подготовить платежное поручение на 890 370.28 ₽', 'medium', this)">
+                      В Канбан
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Direct 1C Queries -->
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span>Примеры запросов к 1С:УНФ</span>
+                </div>
+                <div class="v8-card-body">
+                  <button class="v8-btn" style="justify-content:flex-start;" onclick="query1CODataDirect('Контрагенты')">
+                    Проверить реестр взаиморасчетов
+                  </button>
+                  <button class="v8-btn" style="justify-content:flex-start;" onclick="query1CODataDirect('Заказы')">
+                    Реестр заказов в очереди отгрузки
+                  </button>
+                  <button class="v8-btn" style="justify-content:flex-start;" onclick="query1CODataDirect('Остатки')">
+                    Складские остатки и неликвиды
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: KANBAN BOARD -->
+        <section class="v8-view" id="viewKanban">
+          <div class="v8-kanban-layout">
+            <div class="v8-toolbar">
+              <div class="v8-toolbar-group">
+                <button class="v8-btn v8-btn-primary" onclick="openNewTaskModal()">
+                  <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/>
+                  </svg>
+                  <span>Создать задачу</span>
+                </button>
+                <button class="v8-btn" onclick="filterKanban('all')">Все (5)</button>
+                <button class="v8-btn" onclick="filterKanban('high')">Срочные</button>
+                <button class="v8-btn" onclick="filterKanban('in_progress')">В работе</button>
+              </div>
+              <div class="v8-toolbar-group">
+                <span style="font-size:11.5px;color:var(--text-muted);">
+                  Синхронизация с Задачами исполнителей 1С:УНФ
+                </span>
+              </div>
+            </div>
+
+            <div class="v8-kanban-cols" id="kanbanBoard">
+              <!-- Columns generated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: FINANCIAL & OPERATIONAL MONITOR -->
+        <section class="v8-view" id="viewAnalytics">
+          <div class="v8-analytics-layout">
+            <!-- Header bar with refresh & timestamp -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 2px;">
+              <span style="font-size:12px;font-weight:600;color:var(--text-muted);">
+                Оперативный монитор платёжного календаря и складских остатков
+              </span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="v8-badge success" id="monitorTimestamp">
+                  Демонстрационные данные; источник уточняется после загрузки
+                </span>
+                <button class="v8-btn v8-btn-icon-only" onclick="loadFinancialMonitor()" title="Обновить финансовые показатели из 1С">
+                  <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- 4 Clean KPI Blocks -->
+            <div class="v8-kpi-row">
+              <div class="v8-kpi-block" onclick="sendQuickPrompt('Каков остаток денег на счетах компании?')">
+                <span class="v8-kpi-title">Деньги на счетах компании</span>
+                <span class="v8-kpi-val" id="kpiCash">69 825 848 ₽</span>
+                <div class="v8-kpi-sub">
+                  <span class="v8-badge success">Факт 1С</span>
+                  <span>Банк + Касса</span>
+                </div>
+              </div>
+
+              <div class="v8-kpi-block" onclick="sendQuickPrompt('Будет ли кассовый разрыв на этой неделе?')">
+                <span class="v8-kpi-title">Кассовый разрыв на 7 дней</span>
+                <span class="v8-kpi-val" style="color:var(--badge-green-text);" id="kpiGap">0 ₽</span>
+                <div class="v8-kpi-sub">
+                  <span class="v8-badge success">Безопасно</span>
+                  <span>Запас: 67.1M ₽</span>
+                </div>
+              </div>
+
+              <div class="v8-kpi-block" onclick="sendQuickPrompt('Покажи зависшие и сорванные заказы')">
+                <span class="v8-kpi-title">Сорванные заказы клиентов</span>
+                <span class="v8-kpi-val" style="color:var(--badge-red-text);" id="kpiOrders">174 700 ₽</span>
+                <div class="v8-kpi-sub">
+                  <span class="v8-badge danger">2 заказа</span>
+                  <span>Просрочка > 3 дн</span>
+                </div>
+              </div>
+
+              <div class="v8-kpi-block" onclick="sendQuickPrompt('Какие неликвиды лежат на складе?')">
+                <span class="v8-kpi-title">Неликвиды на складах (>90 дн)</span>
+                <span class="v8-kpi-val" style="color:var(--badge-yellow-text);" id="kpiStock">168 250 ₽</span>
+                <div class="v8-kpi-sub">
+                  <span class="v8-badge warning">2 позиции</span>
+                  <span>Заморозка капитала</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Debtors Table -->
+            <div class="v8-card-box">
+              <div class="v8-card-head">
+                <span>Кредиторская задолженность перед поставщиками (1С:УНФ)</span>
+                <span class="v8-badge danger">2 757 870.28 ₽</span>
+              </div>
+              <div class="v8-table-container">
+                <table class="v8-grid-table">
+                  <thead>
+                    <tr>
+                      <th>Статус</th>
+                      <th>Поставщик</th>
+                      <th>Договор контрагента</th>
+                      <th class="text-right">Сумма долга</th>
+                      <th>Срок оплаты</th>
+                      <th>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="v8-badge danger">К оплате</span></td>
+                      <td><strong>ООО "КабельСнабСервис"</strong></td>
+                      <td>Договор поставки № 12</td>
+                      <td class="text-right" style="font-weight:700;color:var(--badge-red-text);">1 420 500.00 ₽</td>
+                      <td>05.09.2026</td>
+                      <td>
+                        <button class="v8-btn v8-btn-primary" onclick="createKanbanTaskDirect('Оплата: КабельСнабСервис', 'Платеж 1 420 500 ₽ по договору №12', 'high', this)">
+                          Создать платёж
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><span class="v8-badge danger">К оплате</span></td>
+                      <td><strong>ЗАО "Световые Системы"</strong></td>
+                      <td>Основной договор</td>
+                      <td class="text-right" style="font-weight:700;color:var(--badge-red-text);">890 370.28 ₽</td>
+                      <td>04.09.2026</td>
+                      <td>
+                        <button class="v8-btn v8-btn-primary" onclick="createKanbanTaskDirect('Оплата: Световые Системы', 'Платеж 890 370.28 ₽', 'medium', this)">
+                          Создать платёж
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><span class="v8-badge warning">Плановый</span></td>
+                      <td><strong>ИП Григорьев С.В.</strong></td>
+                      <td>Разовый счет №41</td>
+                      <td class="text-right" style="font-weight:700;">447 000.00 ₽</td>
+                      <td>08.09.2026</td>
+                      <td>
+                        <button class="v8-btn" onclick="createKanbanTaskDirect('Оплата: ИП Григорьев', 'Счет №41 на 447 000 ₽', 'low', this)">
+                          В план
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Dead Stock Table -->
+            <div class="v8-card-box">
+              <div class="v8-card-head">
+                <span>Аудит складских неликвидов (Номенклатура без движения >90 дней)</span>
+                <span class="v8-badge warning">168 250.00 ₽</span>
+              </div>
+              <div class="v8-table-container">
+                <table class="v8-grid-table">
+                  <thead>
+                    <tr>
+                      <th>Код 1С</th>
+                      <th>Артикул</th>
+                      <th>Номенклатура</th>
+                      <th>Склад</th>
+                      <th class="text-right">Остаток</th>
+                      <th class="text-right">Себестоимость</th>
+                      <th class="text-right">Дней покоя</th>
+                      <th>Решение</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>00-0000124</td>
+                      <td>КБ-325</td>
+                      <td><strong>Кабель силовой ВВГнг-LS 3x2.5</strong></td>
+                      <td>Основной склад</td>
+                      <td class="text-right">1 200 м</td>
+                      <td class="text-right" style="font-weight:700;color:var(--badge-yellow-text);">96 000.00 ₽</td>
+                      <td class="text-right">142 дн.</td>
+                      <td>
+                        <button class="v8-btn v8-btn-primary" onclick="createKanbanTaskDirect('Уценка: Кабель ВВГнг-LS', 'Запустить уценку 15% для оптовых покупателей.', 'medium', this)">
+                          Уценить 15%
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>00-0000189</td>
+                      <td>СВ-LED36</td>
+                      <td><strong>Светильник светодиодный LED 36W</strong></td>
+                      <td>Склад готовой продукции</td>
+                      <td class="text-right">85 шт</td>
+                      <td class="text-right" style="font-weight:700;color:var(--badge-yellow-text);">72 250.00 ₽</td>
+                      <td class="text-right">118 дн.</td>
+                      <td>
+                        <button class="v8-btn v8-btn-primary" onclick="createKanbanTaskDirect('Уценка: Светильники LED 36W', 'Сформировать акцию для оптовиков.', 'medium', this)">
+                          В промо
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: RUSSIAN BUSINESS MODULES (115-ФЗ, MARGIN, DEBT, STOCK, OCR) -->
+        <section class="v8-view" id="viewBusiness">
+          <div class="v8-business-layout" style="display:flex;flex-direction:column;gap:16px;padding:12px 16px;overflow-y:auto;height:100%;">
+            
+            <!-- Sub-navigation for business tools -->
+            <div class="v8-card-box" style="padding:8px 12px;background:var(--card-bg);">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" id="bizNavButtons">
+                  <button class="v8-btn v8-btn-primary" type="button" onclick="switchBizTool('compliance')">🛡 115-ФЗ и Контрагенты</button>
+                  <button class="v8-btn" type="button" onclick="switchBizTool('margin')">📈 Защита маржи</button>
+                  <button class="v8-btn" type="button" onclick="switchBizTool('debt')">⚖️ Пени ст. 395 ГК РФ</button>
+                  <button class="v8-btn" type="button" onclick="switchBizTool('stock')">📦 Автозаказ ROP/EOQ</button>
+                  <button class="v8-btn" type="button" onclick="switchBizTool('ocr')">📄 OCR счетов и УПД</button>
+                </div>
+                <span class="v8-badge success">Адаптировано для бизнеса РФ (ЦБ РФ, ФНС, 115-ФЗ)</span>
+              </div>
+            </div>
+
+            <!-- TOOL 1: 115-ФЗ COMPLIANCE & COUNTERPARTY AUDIT -->
+            <div class="v8-biz-tool-panel" id="bizToolCompliance">
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span class="v8-card-title">🛡 Проверка контрагента по ИНН и аудит платежей по 115-ФЗ</span>
+                  <span class="v8-badge info">ФНС РФ (ст. 54.1 НК) • Росфинмониторинг</span>
+                </div>
+                <div style="padding:14px;display:flex;flex-direction:column;gap:14px;">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px;">
+                    <!-- Counterparty Card -->
+                    <div style="border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-card);">
+                      <h4 style="margin:0 0 10px;font-size:13px;color:var(--text-main);">1. Экспресс-проверка ИНН контрагента</h4>
+                      <div class="v8-field-group">
+                        <label class="v8-field-label">ИНН контрагента (10 или 12 цифр)</label>
+                        <div style="display:flex;gap:6px;">
+                          <input type="text" id="bizInnInput" class="v8-control-input" value="7707083893" placeholder="7707083893">
+                          <button class="v8-btn v8-btn-primary" type="button" onclick="runCounterpartyCheck()">Проверить</button>
+                        </div>
+                      </div>
+                      <div style="display:flex;gap:12px;margin-top:8px;font-size:11px;">
+                        <label><input type="checkbox" id="bizMassDirector"> Массовый директор</label>
+                        <label><input type="checkbox" id="bizMassAddress"> Массовый адрес</label>
+                      </div>
+                      <div id="bizCounterpartyResult" style="margin-top:12px;padding:10px;border-radius:4px;background:var(--bg-main);font-size:12px;display:none;"></div>
+                    </div>
+
+                    <!-- Payment 115-FZ Audit -->
+                    <div style="border:1px solid var(--border-color);border-radius:4px;padding:12px;background:var(--bg-card);">
+                      <h4 style="margin:0 0 10px;font-size:13px;color:var(--text-main);">2. Аудит назначения платежа по 115-ФЗ</h4>
+                      <div class="v8-field-group">
+                        <label class="v8-field-label">Сумма платежа в рублях</label>
+                        <input type="number" id="bizPayAmount" class="v8-control-input" value="590000" placeholder="590000">
+                      </div>
+                      <div class="v8-field-group" style="margin-top:6px;">
+                        <label class="v8-field-label">Назначение платежа</label>
+                        <textarea id="bizPayPurpose" class="v8-control-input" style="height:50px;resize:none;">Выдача денежных средств: беспроцентный заем учредителю без НДС</textarea>
+                      </div>
+                      <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+                        <label style="font-size:11px;"><input type="checkbox" id="bizIsCash"> Снятие наличных</label>
+                        <button class="v8-btn v8-btn-primary" type="button" onclick="runPaymentAudit()">Проверить 115-ФЗ</button>
+                      </div>
+                      <div id="bizPaymentResult" style="margin-top:12px;padding:10px;border-radius:4px;background:var(--bg-main);font-size:12px;display:none;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TOOL 2: MARGIN PROTECTION & UNIT ECONOMICS -->
+            <div class="v8-biz-tool-panel" id="bizToolMargin" style="display:none;">
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span class="v8-card-title">📈 Защита маржинальности сделок и согласование скидок</span>
+                  <span class="v8-badge warning">Порог рентабельности 15% • ОСНО / УСН</span>
+                </div>
+                <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:10px;">
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Клиент</label>
+                      <input type="text" id="marginClient" class="v8-control-input" value="ООО «Альфа-Комплект»">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Номенклатура</label>
+                      <input type="text" id="marginItemName" class="v8-control-input" value="Кабель силовой ВВГнг-LS 3x2.5">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Количество (м/шт)</label>
+                      <input type="number" id="marginQty" class="v8-control-input" value="1000">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Себестоимость за ед. (руб)</label>
+                      <input type="number" id="marginCost" class="v8-control-input" value="80">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Цена продажи (руб)</label>
+                      <input type="number" id="marginPrice" class="v8-control-input" value="92">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Скидка клиента (%)</label>
+                      <input type="number" id="marginDiscount" class="v8-control-input" value="0">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Отсрочка платежа (дней)</label>
+                      <input type="number" id="marginDelay" class="v8-control-input" value="30">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Система налогообложения</label>
+                      <select id="marginTaxSystem" class="v8-control-input">
+                        <option value="osno">ОСНО (НДС 20% + налог на прибыль 20%)</option>
+                        <option value="usn_income">УСН Доходы 6%</option>
+                        <option value="usn_income_expense">УСН Доходы-расходы 15%</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;">
+                    <button class="v8-btn v8-btn-primary" type="button" onclick="calculateDealMargin()">Рассчитать юнит-экономику сделки</button>
+                  </div>
+                  <div id="marginCalculationOutput" style="display:none;padding:12px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-card);font-size:12px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TOOL 3: DEBT COLLECTION & ART 395 GK RF PENALTY -->
+            <div class="v8-biz-tool-panel" id="bizToolDebt" style="display:none;">
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span class="v8-card-title">⚖️ Расчет процентов по ст. 395 ГК РФ и генерация досудебной претензии</span>
+                  <span class="v8-badge danger">Ключевая ставка ЦБ РФ: 21%</span>
+                </div>
+                <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:10px;">
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Должник (Контрагент)</label>
+                      <input type="text" id="debtDebtor" class="v8-control-input" value="ООО «АльфаТрейд»">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">ИНН должника</label>
+                      <input type="text" id="debtInn" class="v8-control-input" value="7707083893">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Сумма основного долга (руб)</label>
+                      <input type="number" id="debtAmount" class="v8-control-input" value="540000">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Срок оплаты по договору</label>
+                      <input type="date" id="debtDueDate" class="v8-control-input" value="2026-01-15">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Номер договора / УПД</label>
+                      <input type="text" id="debtContract" class="v8-control-input" value="Договор № 01-П от 15.01.2025">
+                    </div>
+                    <div class="v8-field-group">
+                      <label class="v8-field-label">Email должника</label>
+                      <input type="email" id="debtEmail" class="v8-control-input" value="buh@alphatrade.ru">
+                    </div>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button class="v8-btn" type="button" onclick="calculatePenaltyOnly()">Рассчитать проценты по ст. 395</button>
+                    <button class="v8-btn v8-btn-primary" type="button" onclick="generateAndSendClaim()">Сформировать досудебную претензию</button>
+                  </div>
+                  <div id="debtResultOutput" style="display:none;padding:12px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-card);font-size:12px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TOOL 4: SMART STOCK REBALANCING & ROP / EOQ -->
+            <div class="v8-biz-tool-panel" id="bizToolStock" style="display:none;">
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span class="v8-card-title">📦 Автозаказ ROP, формула Уилсона EOQ и выявление неликвидов</span>
+                  <button class="v8-btn v8-btn-primary" type="button" onclick="runStockRebalanceAnalysis()">Запустить расчет складского баланса</button>
+                </div>
+                <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+                  <div id="stockAnalysisSummary" style="font-size:12px;color:var(--text-muted);">
+                    Нажмите «Запустить расчет складского баланса» для аудита остатков, расчета точки перезаказа (ROP) и формирования документа «ЗаказПоставщику» в 1С.
+                  </div>
+                  <div class="v8-table-container">
+                    <table class="v8-grid-table" id="stockAnalysisTable">
+                      <thead>
+                        <tr>
+                          <th>Статус</th>
+                          <th>Артикул</th>
+                          <th>Номенклатура</th>
+                          <th class="text-right">Остаток</th>
+                          <th class="text-right">ROP</th>
+                          <th class="text-right">Партия EOQ</th>
+                          <th class="text-right">Заказ (ед)</th>
+                          <th class="text-right">Сумма заказа / Неликвид</th>
+                          <th>План действий</th>
+                        </tr>
+                      </thead>
+                      <tbody id="stockAnalysisTbody">
+                        <!-- Filled by JS -->
+                      </tbody>
+                    </table>
+                  </div>
+                  <div id="purchaseOrderBox" style="display:none;padding:10px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-main);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                      <strong>Подготовлен черновик «ЗаказПоставщику» для проверки в 1С:УНФ</strong>
+                      <button class="v8-btn v8-btn-sm" type="button" onclick="copyPurchaseOrderJson()">Скопировать JSON 1C</button>
+                    </div>
+                    <pre id="purchaseOrderJsonPre" style="font-size:11px;max-height:160px;overflow-y:auto;background:var(--bg-card);padding:8px;border-radius:3px;margin:0;"></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TOOL 5: MULTIMODAL INVOICE OCR & 1C MATCHING -->
+            <div class="v8-biz-tool-panel" id="bizToolOcr" style="display:none;">
+              <div class="v8-card-box">
+                <div class="v8-card-head">
+                  <span class="v8-card-title">📄 Интеллектуальный OCR счетов, актов и сопоставление со справочником 1С</span>
+                  <button class="v8-btn v8-btn-sm" type="button" onclick="loadSampleInvoiceText()">Вставить образец счета</button>
+                </div>
+                <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+                  <div class="v8-field-group">
+                    <label class="v8-field-label">Текст счета на оплату или распознанный OCR фрагмент</label>
+                    <textarea id="ocrTextInput" class="v8-control-input" style="height:110px;resize:vertical;font-family:monospace;font-size:11px;" placeholder="Вставьте текст счета или накладной..."></textarea>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;">
+                    <button class="v8-btn v8-btn-primary" type="button" onclick="parseInvoiceOcr()">Распознать и сопоставить с 1С</button>
+                  </div>
+                  <div id="ocrResultContainer" style="display:none;padding:12px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-card);">
+                    <div id="ocrHeaderInfo" style="margin-bottom:10px;font-size:12px;"></div>
+                    <div class="v8-table-container">
+                      <table class="v8-grid-table">
+                        <thead>
+                          <tr>
+                            <th>№</th>
+                            <th>Позиция в счете поставщика</th>
+                            <th>Сопоставленная позиция 1С</th>
+                            <th class="text-right">Сходство</th>
+                            <th class="text-right">Кол-во</th>
+                            <th class="text-right">Цена</th>
+                            <th class="text-right">Сумма с НДС 20%</th>
+                            <th>Арифметика</th>
+                          </tr>
+                        </thead>
+                        <tbody id="ocrLinesTbody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- VIEW 5: SYSTEM INFRASTRUCTURE -->
+        <section class="v8-view" id="viewSystem">
+          <div class="v8-system-layout">
+            <div class="v8-card-box">
+              <div class="v8-card-head v8-card-head-adaptive">
+                <span class="v8-card-title">Параметры информационной базы и серверов</span>
+                <button class="v8-btn" onclick="checkInfrastructureStatus()" id="checkStatusBtn">
+                  <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                  </svg>
+                  <span class="v8-btn-full">Диагностика связи</span>
+                  <span class="v8-btn-short">Диагностика</span>
+                </button>
+              </div>
+              <div class="v8-table-container">
+                <table class="v8-grid-table">
+                  <thead>
+                    <tr>
+                      <th>Компонент</th>
+                      <th>Назначение</th>
+                      <th>Адрес / Параметр</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>1С:Предприятие 8.5</strong></td>
+                      <td>Конфигурация «Управление нашей фирмой 3.0»</td>
+                      <td>SmallBusinessDemo (Файловая база)</td>
+                      <td><span class="v8-badge">Не проверено</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Расширение CFE</strong></td>
+                      <td>AIAssistant (Интеллектуальный ассистент)</td>
+                      <td>Требуется установка и проверка в 1С</td>
+                      <td><span class="v8-badge">Не проверено</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Веб-сервер Apache 2.4</strong></td>
+                      <td>Публикация веб-клиента и OData</td>
+                      <td>http://localhost:8081/unf</td>
+                      <td><span class="v8-badge">Не проверено</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Middleware (FastAPI)</strong></td>
+                      <td>Шлюз ИИ, Канбан и интеграции</td>
+                      <td>http://127.0.0.1:8000</td>
+                      <td><span class="v8-badge success">● Порт 8000</span></td>
+                    </tr>
+                    <tr>
+                      <td><strong>OData REST 1С</strong></td>
+                      <td>Стандартный интерфейс OData</td>
+                      <td>/unf/odata/standard.odata/</td>
+                      <td><span class="v8-badge">Не проверено</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- OMNICHANNEL GATEWAY (TELEGRAM, VK, EMAIL) -->
+            <div class="v8-card-box">
+              <div class="v8-card-head v8-card-head-adaptive">
+                <span class="v8-card-title">Омниканальный коммуникационный шлюз</span>
+                <div class="v8-head-actions">
+                  <button class="v8-btn" onclick="openEmailOutboxModal()" id="viewOutboxBtn" title="Просмотр журнала отправленных писем и дайджестов">
+                    <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                      <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                    <span id="outboxCountBtnText">📬 Исходящие письма (Outbox)</span>
+                  </button>
+                  <button class="v8-btn" onclick="checkIntegrationsStatus()" id="checkIntegrationsBtn">
+                    <svg class="v8-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                    <span>Статус</span>
+                  </button>
+                </div>
+              </div>
+              <div class="v8-system-content">
+                <!-- Channel Cards -->
+                <div class="v8-channel-grid">
+                  <!-- Telegram Card -->
+                  <div class="v8-channel-card">
+                    <div class="v8-channel-head">
+                      <div class="v8-channel-title">
+                        <span>📱</span> Telegram Bot
+                      </div>
+                      <span class="v8-badge success" id="tgBadge">● Активен</span>
+                    </div>
+                    <div class="v8-channel-desc">
+                      Inline-меню, голосовой ввод, /gap, /orders, /tasks, /debts, срочные алерты.
+                    </div>
+                    <div class="v8-channel-endpoint">
+                      Webhook: /integrations/telegram/webhook
+                    </div>
+                  </div>
+
+                  <!-- VK Card -->
+                  <div class="v8-channel-card">
+                    <div class="v8-channel-head">
+                      <div class="v8-channel-title">
+                        <span>🌐</span> ВКонтакте Bot
+                      </div>
+                      <span class="v8-badge success" id="vkBadge">● Активен</span>
+                    </div>
+                    <div class="v8-channel-desc">
+                      Кнопочная клавиатура, текстовые команды на русском, финансовые и складские сводки.
+                    </div>
+                    <div class="v8-channel-endpoint">
+                      Callback: /integrations/vk/callback
+                    </div>
+                  </div>
+
+                  <!-- Email Card -->
+                  <div class="v8-channel-card">
+                    <div class="v8-channel-head">
+                      <div class="v8-channel-title">
+                        <span>✉️</span> Корпоративная почта
+                      </div>
+                      <span class="v8-badge success" id="emailBadge">● Робот активен</span>
+                    </div>
+                    <div class="v8-channel-desc">
+                      Email-to-Order робот входящих заявок, утренний дайджест руководителя, претензии должникам.
+                    </div>
+                    <div class="v8-channel-endpoint" style="display:flex; justify-content:space-between; align-items:center;">
+                      <span>Ingestion: /integrations/email/incoming</span>
+                      <button class="v8-btn v8-btn-sm" type="button" onclick="openEmailOutboxModal()" style="font-size:11px; padding:2px 8px;">
+                        📬 Журнал писем
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Live Omnichannel Simulation & Testing Console -->
+                <div class="v8-omni-console-box">
+                  <div class="v8-console-header">
+                    <span class="v8-console-title">⚡ Интерактивная консоль тестирования каналов</span>
+                    <span class="v8-console-sub">Изолированный контур без внешнего IP</span>
+                  </div>
+
+                  <!-- Preset quick buttons -->
+                  <div class="v8-omni-presets">
+                    <button class="v8-btn v8-btn-sm" type="button" onclick="setOmniPreset('telegram', '/gap')">💰 TG: /gap</button>
+                    <button class="v8-btn v8-btn-sm" type="button" onclick="setOmniPreset('telegram', '/tasks')">📋 TG: /tasks</button>
+                    <button class="v8-btn v8-btn-sm" type="button" onclick="setOmniPreset('vk', 'Канбан')">🌐 VK: Канбан</button>
+                    <button class="v8-btn v8-btn-sm" type="button" onclick="setOmniPreset('email_order', 'Срочный заказ на кабель ВВГнг 50м')">✉️ Email: Заявка</button>
+                    <button class="v8-btn v8-btn-sm" type="button" onclick="setOmniPreset('email_digest', '')">📊 Email: Дайджест</button>
+                  </div>
+
+                  <div class="v8-omni-input-row">
+                    <select id="omniChannelSelect" class="v8-control-input">
+                      <option value="telegram">📱 Telegram Bot</option>
+                      <option value="vk">🌐 ВКонтакте Bot</option>
+                      <option value="email">✉️ Email (Заказ / Дайджест)</option>
+                    </select>
+                    <input type="text" id="omniCommandInput" class="v8-control-input" placeholder="Команда (/gap, /tasks) или текст заявки">
+                    <button class="v8-btn v8-btn-primary" type="button" onclick="sendOmnichannelTest()" id="omniSendBtn">Отправить в шлюз</button>
+                  </div>
+
+                  <!-- Output window -->
+                  <div id="omniConsoleOutput" class="v8-console-output">Готов к тестированию омниканального шлюза. Выберите канал и нажмите «Отправить в шлюз»...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- 1C Standard Task Modal Dialog -->
+  <div class="v8-modal-backdrop" id="taskModal" style="display: none;">
+    <div class="v8-dialog">
+      <div class="v8-dialog-titlebar">
+        <span>Задача исполнителю (1С:УНФ)</span>
+        <button type="button" class="v8-btn v8-btn-icon-only" style="border:none;background:transparent;" onclick="closeTaskModal()">✕</button>
+      </div>
+      <form id="newTaskForm" onsubmit="handleCreateTask(event)">
+        <div class="v8-dialog-content">
+          <div class="v8-field-group">
+            <label class="v8-field-label">Наименование поручения *</label>
+            <input type="text" id="taskTitle" class="v8-control-input" required placeholder="Например: Срочный созвон с ООО АльфаТрейд">
+          </div>
+          <div class="v8-field-group">
+            <label class="v8-field-label">Описание и реквизиты</label>
+            <textarea id="taskDesc" class="v8-control-input" style="height:60px;padding:4px 8px;resize:none;" placeholder="Подробности задачи, сумма, ссылка на документ 1С..."></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="v8-field-group">
+              <label class="v8-field-label">Важность</label>
+              <select id="taskPriority" class="v8-control-input">
+                <option value="medium">Обычная</option>
+                <option value="high">Высокая (Срочно)</option>
+                <option value="low">Низкая</option>
+              </select>
+            </div>
+            <div class="v8-field-group">
+              <label class="v8-field-label">Стадия</label>
+              <select id="taskColumn" class="v8-control-input">
+                <option value="todo">К выполнению</option>
+                <option value="in_progress">В работе</option>
+                <option value="review">На проверке</option>
+                <option value="done">Завершено</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="v8-dialog-actions">
+          <button type="submit" class="v8-btn v8-btn-primary">Записать и закрыть</button>
+          <button type="button" class="v8-btn" onclick="closeTaskModal()">Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Email Outbox Modal Dialog -->
+  <div class="v8-modal-backdrop" id="emailOutboxModal" style="display: none;">
+    <div class="v8-dialog" style="max-width: 780px; width: 92%;">
+      <div class="v8-dialog-titlebar">
+        <span>Корпоративная электронная почта (Журнал исходящих / Outbox)</span>
+        <button type="button" class="v8-btn v8-btn-icon-only" style="border:none;background:transparent;" onclick="closeEmailOutboxModal()">✕</button>
+      </div>
+      <div class="v8-dialog-content" style="max-height: 480px; overflow-y: auto; padding: 12px;">
+        <div id="emailOutboxList" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+      <div class="v8-dialog-actions">
+        <button type="button" class="v8-btn" onclick="closeEmailOutboxModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1C Authentic Login Dialog Modal -->
+  <div class="v8-modal-backdrop" id="loginModal" style="display: none; z-index: 10000;">
+    <div class="v8-dialog" style="max-width: 480px; width: 92%;">
+      <div class="v8-dialog-titlebar">
+        <span>1С:Предприятие 8.5 — Аутентификация пользователя</span>
+        <button type="button" class="v8-btn v8-btn-icon-only" style="border:none;background:transparent;" onclick="closeLoginModal()">✕</button>
+      </div>
+      <div class="v8-dialog-content" style="padding: 16px;">
+        <div style="margin-bottom: 12px; font-size: 11px; color: var(--text-muted);">
+          Выберите учетную запись для быстрой авторизации или введите логин и пароль:
+        </div>
+
+        <!-- Quick Select Role Grid -->
+        <div class="v8-quick-roles-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+          <button type="button" class="v8-role-btn" onclick="quickFillLogin('director', 'director123')">
+            <span class="v8-role-icon">👑</span>
+            <div style="text-align:left;">
+              <strong style="font-size:12px;display:block;">Абдулов Р.Ф.</strong>
+              <small style="font-size:10px;color:var(--text-dim);">Директор (полный доступ)</small>
+            </div>
+          </button>
+          <button type="button" class="v8-role-btn" onclick="quickFillLogin('cfo', 'cfo123')">
+            <span class="v8-role-icon">💼</span>
+            <div style="text-align:left;">
+              <strong style="font-size:12px;display:block;">Филиппова Е.А.</strong>
+              <small style="font-size:10px;color:var(--text-dim);">CFO (Финансы / 115-ФЗ)</small>
+            </div>
+          </button>
+          <button type="button" class="v8-role-btn" onclick="quickFillLogin('manager', 'manager123')">
+            <span class="v8-role-icon">👔</span>
+            <div style="text-align:left;">
+              <strong style="font-size:12px;display:block;">Иванов А.С.</strong>
+              <small style="font-size:10px;color:var(--text-dim);">Менеджер (Продажи)</small>
+            </div>
+          </button>
+          <button type="button" class="v8-role-btn" onclick="quickFillLogin('warehouse', 'warehouse123')">
+            <span class="v8-role-icon">📦</span>
+            <div style="text-align:left;">
+              <strong style="font-size:12px;display:block;">Сидорова М.П.</strong>
+              <small style="font-size:10px;color:var(--text-dim);">Склад (Запасы / ROP)</small>
+            </div>
+          </button>
+          <button type="button" class="v8-role-btn" onclick="quickFillLogin('employee', 'employee123')">
+            <span class="v8-role-icon">👤</span>
+            <div style="text-align:left;">
+              <strong style="font-size:12px;display:block;">Тестов Т.П.</strong>
+              <small style="font-size:10px;color:var(--text-dim);">Сотрудник (Ограничен)</small>
+            </div>
+          </button>
+          <button type="button" class="v8-role-btn" onclick="quickFillLogin('admin', 'admin')">
+            <span class="v8-role-icon">🛠</span>
+            <div style="text-align:left;">
+              <strong style="font-size:12px;display:block;">Администратор</strong>
+              <small style="font-size:10px;color:var(--text-dim);">IT и сервисы</small>
+            </div>
+          </button>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+          <div class="v8-field-group">
+            <label class="v8-field-label">Пользователь 1С</label>
+            <input type="text" id="loginUsername" class="v8-control-input" required placeholder="director">
+          </div>
+          <div class="v8-field-group" style="margin-top: 8px;">
+            <label class="v8-field-label">Пароль</label>
+            <input type="password" id="loginPassword" class="v8-control-input" required placeholder="••••••••">
+          </div>
+
+          <div id="loginErrorMsg" style="display:none; margin-top:8px; padding:6px 10px; background:#fee2e2; color:#b91c1c; border-radius:4px; font-size:11px;"></div>
+
+          <div class="v8-dialog-actions" style="margin-top: 16px;">
+            <button type="submit" class="v8-btn v8-btn-primary" id="loginSubmitBtn">Войти в 1С:Предприятие</button>
+            <button type="button" class="v8-btn" onclick="closeLoginModal()">Отмена</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer"></div>
+
+  <script src="/static/app.js?v=20260910-rbac"></script>
+</body>
+</html>

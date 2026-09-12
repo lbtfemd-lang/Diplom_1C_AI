@@ -22,12 +22,24 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
+from app.core.db import enable_sqlite_wal
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "kanban.db")
+def get_sqlite_db_path() -> str:
+    env_path = os.getenv("SQLITE_DB_PATH")
+    if env_path:
+        p = os.path.abspath(env_path)
+    else:
+        p = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "kanban.db"))
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    return p
+
+DB_PATH = get_sqlite_db_path()
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, connect_args={"check_same_thread": False})
+enable_sqlite_wal(engine)
 SessionLocal = sessionmaker(bind=engine)
 class Base(DeclarativeBase):
     pass
@@ -75,12 +87,41 @@ class UserDB(Base):
 Base.metadata.create_all(engine)
 
 
+ROLE_PERMISSIONS = {
+    "admin": {"*"},
+    "director": {"*"},
+    "cfo": {
+        "analytics:read", "financial:read", "debt:read", "debt:write",
+        "compliance:read", "compliance:write", "margin:read", "margin:write",
+        "stock:read", "kanban:read", "kanban:write"
+    },
+    "manager": {
+        "kanban:read", "kanban:write", "margin:read", "stock:read", "debt:read"
+    },
+    "warehouse": {
+        "stock:read", "stock:write", "kanban:read", "kanban:write"
+    },
+    "employee": {
+        "kanban:read", "tasks:own"
+    }
+}
+
+
 class AuthService:
     def __init__(self):
-        self._seed_if_empty()
+        self._seed_default_users()
 
     def _get_session(self):
         return SessionLocal()
+
+    @staticmethod
+    def has_permission(role: str, permission: str) -> bool:
+        perms = ROLE_PERMISSIONS.get(role, set())
+        return "*" in perms or permission in perms
+
+    @staticmethod
+    def can_access_financials(role: str) -> bool:
+        return role in ("director", "cfo", "admin")
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -110,81 +151,98 @@ class AuthService:
         h = hash(name) % len(AVATAR_COLORS)
         return AVATAR_COLORS[h]
 
-    def _seed_if_empty(self):
+    def _seed_default_users(self):
+        """Гарантирует наличие всех ключевых ролей и пользователей для бизнес-сценариев."""
         session = self._get_session()
         try:
-            if session.query(UserDB).count() > 0:
-                return
+            # 1. Создаем или находим подразделения
+            dept_names = ["Дирекция", "Финансовый отдел", "Продажи", "Закупки", "Склад", "IT"]
+            dept_map = {}
+            for d_name in dept_names:
+                dept = session.query(DepartmentDB).filter_by(name=d_name).first()
+                if not dept:
+                    dept = DepartmentDB(name=d_name)
+                    session.add(dept)
+                    session.flush()
+                dept_map[d_name] = dept.id
 
-            logger.info("Seeding demo data...")
-
-            departments = [
-                DepartmentDB(name="Продажи"),
-                DepartmentDB(name="Закупки"),
-                DepartmentDB(name="Склад"),
-                DepartmentDB(name="IT"),
+            # 2. Список обязательных пользователей системы
+            default_users = [
+                {
+                    "username": "director",
+                    "password": "director123",
+                    "full_name": "Абдулов Ринат Фаридович",
+                    "role": "director",
+                    "department_id": dept_map.get("Дирекция"),
+                },
+                {
+                    "username": "cfo",
+                    "password": "cfo123",
+                    "full_name": "Филиппова Елена Анатольевна",
+                    "role": "cfo",
+                    "department_id": dept_map.get("Финансовый отдел"),
+                },
+                {
+                    "username": "manager",
+                    "password": "manager123",
+                    "full_name": "Иванов Алексей Сергеевич",
+                    "role": "manager",
+                    "department_id": dept_map.get("Продажи"),
+                },
+                {
+                    "username": "warehouse",
+                    "password": "warehouse123",
+                    "full_name": "Сидорова Мария Петровна",
+                    "role": "warehouse",
+                    "department_id": dept_map.get("Склад"),
+                },
+                {
+                    "username": "employee",
+                    "password": "employee123",
+                    "full_name": "Тестов Тимур Павлович",
+                    "role": "employee",
+                    "department_id": dept_map.get("Продажи"),
+                },
+                {
+                    "username": "admin",
+                    "password": "admin",
+                    "full_name": "Администратор Системы",
+                    "role": "admin",
+                    "department_id": dept_map.get("IT"),
+                },
+                {
+                    "username": "accountant",
+                    "password": "buh123",
+                    "full_name": "Смирнова Ольга Викторовна (Главбух)",
+                    "role": "cfo",
+                    "department_id": dept_map.get("Финансовый отдел"),
+                },
+                {
+                    "username": "1c_service",
+                    "password": "1c_service_2024",
+                    "full_name": "1С:Предприятие (сервисный транспорт)",
+                    "role": "service_bridge",
+                    "department_id": dept_map.get("IT"),
+                },
             ]
-            session.add_all(departments)
-            session.flush()
 
-            users = [
-                UserDB(
-                    username="admin",
-                    password_hash=self.hash_password("admin"),
-                    full_name="Администратор Системы",
-                    role="admin",
-                    department_id=departments[3].id,
-                    avatar_color=self._avatar_color_for_name("admin"),
-                ),
-                UserDB(
-                    username="ivanov",
-                    password_hash=self.hash_password("123456"),
-                    full_name="Иванов Алексей Сергеевич",
-                    role="manager",
-                    department_id=departments[0].id,
-                    avatar_color=self._avatar_color_for_name("ivanov"),
-                ),
-                UserDB(
-                    username="petrov",
-                    password_hash=self.hash_password("123456"),
-                    full_name="Петров Дмитрий Иванович",
-                    role="manager",
-                    department_id=departments[1].id,
-                    avatar_color=self._avatar_color_for_name("petrov"),
-                ),
-                UserDB(
-                    username="sidorova",
-                    password_hash=self.hash_password("123456"),
-                    full_name="Сидорова Мария Петровна",
-                    role="employee",
-                    department_id=departments[2].id,
-                    avatar_color=self._avatar_color_for_name("sidorova"),
-                ),
-                UserDB(
-                    username="1c_service",
-                    password_hash=self.hash_password("1c_service_2024"),
-                    full_name="1С:Предприятие (сервисный аккаунт)",
-                    role="admin",
-                    department_id=departments[3].id,
-                    avatar_color=self._avatar_color_for_name("1c_service"),
-                ),
-                UserDB(
-                    username="test",
-                    password_hash=self.hash_password("test"),
-                    full_name="Тестовый Пользователь",
-                    role="employee",
-                    department_id=departments[0].id,
-                    avatar_color=self._avatar_color_for_name("test"),
-                ),
-            ]
-            session.add_all(users)
-
-            departments[0].head_user_id = users[1].id
-            departments[1].head_user_id = users[2].id
-            departments[3].head_user_id = users[0].id
+            for u_data in default_users:
+                existing = session.query(UserDB).filter_by(username=u_data["username"]).first()
+                if not existing:
+                    user = UserDB(
+                        username=u_data["username"],
+                        password_hash=self.hash_password(u_data["password"]),
+                        full_name=u_data["full_name"],
+                        role=u_data["role"],
+                        department_id=u_data["department_id"],
+                        avatar_color=self._avatar_color_for_name(u_data["username"]),
+                    )
+                    session.add(user)
+                # Existing accounts belong to the administrator. Never restore
+                # a revoked role or overwrite credentials during startup.
 
             session.commit()
-            logger.info("Demo data seeded: 4 departments, 6 users.")
+            logger.info("Default roles & users verified: director, cfo, accountant, manager, warehouse, employee, admin, service_bridge.")
         except Exception as e:
             session.rollback()
             logger.error("Seed error: %s", e)
@@ -195,9 +253,29 @@ class AuthService:
         session = self._get_session()
         try:
             user = session.query(UserDB).filter_by(username=username, is_active=True).first()
-            if not user or not self.verify_password(password, user.password_hash):
+            if not user:
+                return None
+            if not self.verify_password(password, user.password_hash):
                 return None
             return self._user_to_dict(user)
+        finally:
+            session.close()
+
+    def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
+        """Смена пароля пользователя с обязательной верификацией текущего пароля."""
+        session = self._get_session()
+        try:
+            user = session.query(UserDB).filter_by(id=user_id).first()
+            if not user:
+                return False
+            if not self.verify_password(old_password, user.password_hash):
+                return False
+            user.password_hash = self.hash_password(new_password)
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            raise e
         finally:
             session.close()
 
